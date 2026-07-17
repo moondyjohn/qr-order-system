@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}首頁 - 二維碼掃碼點餐系統{% endblock %}
+﻿{% extends "base.html" %}
+{% block title %}棣栭爜 - 浜岀董纰兼巸纰奸粸椁愮郴绲眥% endblock %}
 {% block extra_head %}
 <style>
 .btn-qr {
@@ -50,7 +50,7 @@
 }
 .qr-actions button { flex: 1; }
 
-/* ===== 搜尋欄 ===== */
+/* ===== 鎼滃皨娆?===== */
 .search-bar {
     display: flex;
     align-items: center;
@@ -103,32 +103,32 @@
 {% endblock %}
 {% block body %}
 <nav class="navbar">
-    <a href="/" class="logo">QR 掃碼點餐</a>
+    <a href="/" class="logo">QR 鎺冪⒓榛為</a>
     <div class="nav-links">
-        <a href="/admin">管理後台</a>
+        <a href="/admin">绠＄悊寰屽彴</a>
     </div>
 </nav>
 
 <div class="container">
     <div class="home-hero">
-        <h1>歡迎使用掃碼點餐</h1>
-        <p>選擇您的檯號，開始點餐</p>
+        <h1>姝¤繋浣跨敤鎺冪⒓榛為</h1>
+        <p>閬告搰鎮ㄧ殑妾櫉锛岄枊濮嬮粸椁?/p>
     </div>
 
     {% if tables %}
     <div class="card">
         <div class="card-header">
-            <div class="card-title">選擇檯號</div>
-            <div style="color: var(--text-light); font-size: 14px; font-weight: 600;">共 {{ tables|length }} 桌</div>
+            <div class="card-title">閬告搰妾櫉</div>
+            <div style="color: var(--text-light); font-size: 14px; font-weight: 600;">鍏?{{ tables|length }} 妗?/div>
         </div>
 
-        <!-- 搜尋欄 -->
+        <!-- 鎼滃皨娆?-->
         <div class="search-bar">
             <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input type="text" class="search-input" inputmode="numeric" pattern="[0-9]*" placeholder="輸入台號搜尋..." id="tableSearch" autocomplete="off">
+            <input type="text" class="search-input" inputmode="numeric" pattern="[0-9]*" placeholder="杓稿叆鍙拌櫉鎼滃皨..." id="tableSearch" autocomplete="off">
         </div>
 
         <div class="table-grid">
@@ -138,46 +138,46 @@
                     <div class="table-icon">
                         <span class="table-icon-num">{{ t.table_number }}</span>
                     </div>
-                    <div class="table-number">{{ t.table_number }} 號桌</div>
-                    <span class="status-badge status-idle" id="badge-{{ t.table_number }}">閒置</span>
+                    <div class="table-number">{{ t.table_number }} 铏熸</div>
+                    <span class="status-badge status-idle" id="badge-{{ t.table_number }}">闁掔疆</span>
                 </a>
                 <div class="table-actions">
                     <button class="btn-qr" onclick="showQRCode({{ t.table_number }})">
-                        📱 二維碼
+                        馃摫 浜岀董纰?
                     </button>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- 無匹配提示 -->
-        <div class="no-match-msg" id="noMatchMsg">無匹配台號</div>
+        <!-- 鐒″尮閰嶆彁绀?-->
+        <div class="no-match-msg" id="noMatchMsg">鐒″尮閰嶅彴铏?/div>
     </div>
     {% else %}
     <div class="card" style="text-align: center; padding: 60px 20px;">
-        <div style="font-size: 52px; margin-bottom: 16px;">📋</div>
-        <p style="color: var(--text-light); font-size: 15px;">暫無台號，請先在管理後台添加</p>
-        <a href="/admin/tables" class="btn btn-primary" style="margin-top: 16px;">去添加台號</a>
+        <div style="font-size: 52px; margin-bottom: 16px;">馃搵</div>
+        <p style="color: var(--text-light); font-size: 15px;">鏆劇鍙拌櫉锛岃珛鍏堝湪绠＄悊寰屽彴娣诲姞</p>
+        <a href="/admin/tables" class="btn btn-primary" style="margin-top: 16px;">鍘绘坊鍔犲彴铏?/a>
     </div>
     {% endif %}
 </div>
 
-<!-- 二維碼彈窗 -->
+<!-- 浜岀董纰煎綀绐?-->
 <div class="qr-modal" id="qrModal">
     <div class="qr-content">
-        <h3 id="qrTitle" style="font-size:18px;">台號二維碼</h3>
-        <img id="qrImage" src="" alt="台號二維碼">
+        <h3 id="qrTitle" style="font-size:18px;">鍙拌櫉浜岀董纰?/h3>
+        <img id="qrImage" src="" alt="鍙拌櫉浜岀董纰?>
         <p style="font-size: 13px; color: var(--text-light); word-break: break-all;" id="qrUrl"></p>
         <div class="qr-actions">
-            <button class="btn btn-success" onclick="downloadQR()">下載二維碼</button>
-            <button class="btn btn-outline" onclick="closeQR()">關閉</button>
+            <button class="btn btn-success" onclick="downloadQR()">涓嬭級浜岀董纰?/button>
+            <button class="btn btn-outline" onclick="closeQR()">闂滈枆</button>
         </div>
     </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
-// ===== 台號搜尋功能 =====
+// ===== 鍙拌櫉鎼滃皨鍔熻兘 =====
 (function() {
     const searchInput = document.getElementById('tableSearch');
     const noMatchMsg = document.getElementById('noMatchMsg');
@@ -208,7 +208,7 @@
             noMatchMsg.style.display = 'none';
         }
 
-        // 僅有一個匹配時自動滾動
+        // 鍍呮湁涓€鍊嬪尮閰嶆檪鑷嫊婊惧嫊
         if (visibleCount === 1 && firstVisible) {
             firstVisible.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -216,11 +216,11 @@
 })();
 
 const STATUS_MAP = {
-    '閒置': { cls: 'status-idle', text: '閒置' },
-    '下單': { cls: 'status-pending', text: '下單' },
-    '確認': { cls: 'status-confirmed', text: '確認' },
-    '結賬': { cls: 'status-completed', text: '結賬' },
-    '取消': { cls: 'status-cancelled', text: '取消' }
+    '闁掔疆': { cls: 'status-idle', text: '闁掔疆' },
+    '涓嬪柈': { cls: 'status-pending', text: '涓嬪柈' },
+    '纰鸿獚': { cls: 'status-confirmed', text: '纰鸿獚' },
+    '绲愯超': { cls: 'status-completed', text: '绲愯超' },
+    '鍙栨秷': { cls: 'status-cancelled', text: '鍙栨秷' }
 };
 
 fetch('/api/admin/tables')
@@ -229,7 +229,7 @@ fetch('/api/admin/tables')
         data.forEach(t => {
             const badge = document.getElementById('badge-' + t.table_number);
             if (badge) {
-                const info = STATUS_MAP[t.status] || STATUS_MAP['閒置'];
+                const info = STATUS_MAP[t.status] || STATUS_MAP['闁掔疆'];
                 badge.className = 'status-badge ' + info.cls;
                 badge.textContent = info.text;
             }
@@ -254,15 +254,15 @@ function showQRCode(tableNumber) {
         .then(r => r.json())
         .then(tables => {
             const table = tables.find(t => t.table_number == tableNumber);
-            if (!table) { alert('未找到台號信息'); return; }
+            if (!table) { alert('鏈壘鍒板彴铏熶俊鎭?); return; }
             currentQRImage = table.qr_code;
             currentQRUrl = table.order_url;
-            document.getElementById('qrTitle').textContent = `${tableNumber} 號桌二維碼`;
+            document.getElementById('qrTitle').textContent = `${tableNumber} 铏熸浜岀董纰糮;
             document.getElementById('qrImage').src = currentQRImage;
             document.getElementById('qrUrl').textContent = currentQRUrl;
             document.getElementById('qrModal').classList.add('active');
         })
-        .catch(err => alert('獲取二維碼失敗: ' + err));
+        .catch(err => alert('鐛插彇浜岀董纰煎け鏁? ' + err));
 }
 
 function closeQR() {
@@ -273,7 +273,7 @@ function closeQR() {
 function downloadQR() {
     if (!currentQRImage) return;
     const link = document.createElement('a');
-    link.download = `台號${currentTableNumber}二維碼.png`;
+    link.download = `鍙拌櫉${currentTableNumber}浜岀董纰?png`;
     link.href = currentQRImage;
     document.body.appendChild(link);
     link.click();
