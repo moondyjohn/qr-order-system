@@ -8,7 +8,8 @@ import qrcode
 import base64
 from io import BytesIO
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for, session
+from functools import wraps
 from PIL import Image
 
 from database import db, init_db, Table, Category, Dish, Order, OrderItem
@@ -68,8 +69,9 @@ def order_page(table_number):
         dishes = Dish.query.filter_by(category_id=cat.id, is_available=True).all()
         if dishes:
             dishes_by_category[cat] = dishes
+    from_home = request.args.get('ref') == 'home'
     return render_template('table_order.html', table=table,
-                          categories=dishes_by_category)
+                          categories=dishes_by_category, from_home=from_home)
 
 
 @app.route('/api/order/<table_number>/orders', methods=['GET'])
@@ -138,14 +140,46 @@ def submit_order(table_number):
     return jsonify({'success': True, 'order_id': order.id, 'total': total})
 
 
+# ======================== 管理後台認證 ========================
+
+ADMIN_PASSWORD = 'admin888'
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    error = None
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin'))
+        error = '密碼錯誤'
+    return render_template('admin_login.html', error=error)
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
+
 # ======================== 管理後台路由 ========================
 
 @app.route('/admin')
+@admin_required
 def admin():
     return render_template('admin.html')
 
 
 @app.route('/admin/dishes')
+@admin_required
 def admin_dishes():
     categories = Category.query.order_by(Category.sort_order).all()
     dishes = Dish.query.order_by(Dish.id.desc()).all()
@@ -153,23 +187,27 @@ def admin_dishes():
 
 
 @app.route('/admin/tables')
+@admin_required
 def admin_tables():
     tables = Table.query.order_by(Table.table_number).all()
     return render_template('admin_tables.html', tables=tables)
 
 
 @app.route('/admin/orders')
+@admin_required
 def admin_orders():
     orders = Order.query.order_by(Order.created_at.desc()).all()
     return render_template('admin_orders.html', orders=orders)
 
 
 @app.route('/admin/categories')
+@admin_required
 def admin_categories():
     return render_template('admin_categories.html')
 
 
 @app.route('/admin/reports')
+@admin_required
 def admin_reports():
     return render_template('admin_reports.html')
 
@@ -177,6 +215,7 @@ def admin_reports():
 # ======================== 管理 API ========================
 
 @app.route('/api/admin/categories', methods=['GET'])
+@admin_required
 def get_categories():
     cats = Category.query.order_by(Category.sort_order).all()
     result = []
@@ -192,6 +231,7 @@ def get_categories():
 
 
 @app.route('/api/admin/categories', methods=['POST'])
+@admin_required
 def add_category():
     data = request.get_json()
     if not data:
@@ -212,6 +252,7 @@ def add_category():
 
 
 @app.route('/api/admin/categories/<int:cat_id>', methods=['PUT'])
+@admin_required
 def update_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     data = request.get_json()
@@ -234,6 +275,7 @@ def update_category(cat_id):
 
 
 @app.route('/api/admin/categories/<int:cat_id>', methods=['DELETE'])
+@admin_required
 def delete_category(cat_id):
     cat = Category.query.get_or_404(cat_id)
     dish_count = Dish.query.filter_by(category_id=cat_id).count()
@@ -245,6 +287,7 @@ def delete_category(cat_id):
 
 
 @app.route('/api/admin/dishes', methods=['GET'])
+@admin_required
 def get_dishes():
     dishes = Dish.query.order_by(Dish.id.desc()).all()
     result = []
@@ -264,6 +307,7 @@ def get_dishes():
 
 
 @app.route('/api/admin/dishes', methods=['POST'])
+@admin_required
 def add_dish():
     data = request.form if request.form else request.get_json()
     if not data:
@@ -298,6 +342,7 @@ def add_dish():
 
 
 @app.route('/api/admin/dishes/<int:dish_id>', methods=['PUT'])
+@admin_required
 def update_dish(dish_id):
     dish = Dish.query.get_or_404(dish_id)
 
@@ -335,6 +380,7 @@ def update_dish(dish_id):
 
 
 @app.route('/api/admin/dishes/<int:dish_id>', methods=['DELETE'])
+@admin_required
 def delete_dish(dish_id):
     dish = Dish.query.get_or_404(dish_id)
 
@@ -366,6 +412,7 @@ def delete_dish(dish_id):
 
 
 @app.route('/api/admin/tables', methods=['GET'])
+@admin_required
 def get_tables():
     tables = Table.query.order_by(Table.table_number).all()
     result = []
@@ -397,6 +444,7 @@ def get_tables():
 
 
 @app.route('/api/admin/tables', methods=['POST'])
+@admin_required
 def add_table():
     data = request.get_json()
     table_number = data.get('table_number', '').strip()
@@ -420,6 +468,7 @@ def add_table():
 
 
 @app.route('/api/admin/tables/batch', methods=['POST'])
+@admin_required
 def batch_add_tables():
     """批量生成檯號，格式 1001-1012"""
     data = request.get_json()
@@ -474,6 +523,7 @@ def batch_add_tables():
 
 
 @app.route('/api/admin/tables/<int:table_id>', methods=['DELETE'])
+@admin_required
 def delete_table(table_id):
     table = Table.query.get_or_404(table_id)
     # 檢查是否有未完成訂單
@@ -486,6 +536,7 @@ def delete_table(table_id):
 
 
 @app.route('/api/admin/orders', methods=['GET'])
+@admin_required
 def get_orders():
     status = request.args.get('status', '')
     query = Order.query
@@ -513,6 +564,7 @@ def get_orders():
 
 
 @app.route('/api/admin/orders/<int:order_id>/status', methods=['PUT'])
+@admin_required
 def update_order_status(order_id):
     order = Order.query.get_or_404(order_id)
     data = request.get_json()
@@ -548,6 +600,7 @@ def table_checkout(table_id):
 
 
 @app.route('/api/admin/reports/daily', methods=['GET'])
+@admin_required
 def get_daily_report():
     """獲取每日營業額統計"""
     date_str = request.args.get('date')
@@ -594,6 +647,7 @@ def get_daily_report():
 
 
 @app.route('/api/admin/reports/monthly', methods=['GET'])
+@admin_required
 def get_monthly_report():
     """獲取月度營業額統計"""
     year = request.args.get('year', datetime.now().year)

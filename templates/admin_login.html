@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理後台登入</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .login-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+            padding: 20px;
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .login-icon {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .login-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: #2D2A26;
+            margin-bottom: 6px;
+        }
+        .login-sub {
+            text-align: center;
+            font-size: 13px;
+            color: #8B857E;
+            margin-bottom: 28px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #5A5550;
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #E8E2DA;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #FF6B35;
+            box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+        }
+        .login-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(255,107,53,0.3);
+        }
+        .login-btn:active {
+            transform: translateY(0);
+        }
+        .error-msg {
+            background: #FFE8E0;
+            color: #D34A1A;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .back-home {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #8B857E;
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .back-home:hover {
+            color: #FF6B35;
+        }
+    </style>
+</head>
+<body>
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-icon">🔒</div>
+        <div class="login-title">管理後台</div>
+        <div class="login-sub">請輸入管理員密碼</div>
+
+        {% if error %}
+        <div class="error-msg">⚠ {{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label>管理員密碼</label>
+                <input type="password" name="password" class="form-input" required autofocus placeholder="請輸入密碼">
+            </div>
+            <button type="submit" class="login-btn">登入</button>
+        </form>
+
+        <a href="/" class="back-home">← 返回點餐首頁</a>
+    </div>
+</div>
+</body>
+</html>
