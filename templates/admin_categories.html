@@ -1,0 +1,142 @@
+{% extends "admin.html" %}
+{% block title %}分類管理 - 管理後台{% endblock %}
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📂 分類管理</div>
+        <button class="btn btn-primary" onclick="openCategoryModal()">+ 新增分類</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>分類名稱</th>
+                    <th>排序</th>
+                    <th>菜式數量</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="categoryTableBody">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-light);">載入中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 新增/編輯分類彈窗 -->
+<div class="modal-overlay" id="categoryModal">
+    <div class="modal" style="max-width: 460px;">
+        <div class="modal-title" id="categoryModalTitle">新增分類</div>
+        <form id="categoryForm">
+            <input type="hidden" id="categoryId" value="">
+            <div class="form-group">
+                <label>分類名稱 *</label>
+                <input type="text" class="form-control" id="categoryName" required placeholder="例如：熱菜、涼菜、湯品...">
+            </div>
+            <div class="form-group">
+                <label>排序 (數字越小越靠前)</label>
+                <input type="number" class="form-control" id="categorySort" min="0" value="0" placeholder="0">
+            </div>
+        </form>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeCategoryModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveCategory()">保存</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+function loadCategories() {
+    fetch('/api/admin/categories')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('categoryTableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-light);">暫無分類，點擊右上角新增</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(c => `
+                <tr>
+                    <td>${c.id}</td>
+                    <td><strong>${c.name}</strong></td>
+                    <td>${c.sort_order}</td>
+                    <td>${c.dish_count}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="editCategory(${c.id}, '${c.name.replace(/'/g, "\\'")}', ${c.sort_order})">編輯</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id}, '${c.name.replace(/'/g, "\\'")}')" style="margin-left:4px;">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function openCategoryModal() {
+    document.getElementById('categoryModalTitle').textContent = '新增分類';
+    document.getElementById('categoryId').value = '';
+    document.getElementById('categoryName').value = '';
+    document.getElementById('categorySort').value = '0';
+    document.getElementById('categoryModal').classList.add('active');
+}
+
+function closeCategoryModal() {
+    document.getElementById('categoryModal').classList.remove('active');
+}
+
+function editCategory(id, name, sortOrder) {
+    document.getElementById('categoryModalTitle').textContent = '編輯分類';
+    document.getElementById('categoryId').value = id;
+    document.getElementById('categoryName').value = name;
+    document.getElementById('categorySort').value = sortOrder;
+    document.getElementById('categoryModal').classList.add('active');
+}
+
+function saveCategory() {
+    const id = document.getElementById('categoryId').value;
+    const name = document.getElementById('categoryName').value.trim();
+    if (!name) { showToast('請輸入分類名稱', 'warning'); return; }
+    const sortOrder = parseInt(document.getElementById('categorySort').value) || 0;
+
+    const url = id ? `/api/admin/categories/${id}` : '/api/admin/categories';
+    const method = id ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, sort_order: sortOrder })
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(id ? '修改成功' : '新增成功');
+                closeCategoryModal();
+                loadCategories();
+            } else {
+                showToast(data.error || '操作失敗', 'error');
+            }
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+function deleteCategory(id, name) {
+    if (!confirm(`確定刪除分類「${name}」嗎？`)) return;
+    fetch(`/api/admin/categories/${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || '刪除成功');
+                loadCategories();
+            } else {
+                showToast(data.error || '刪除失敗', 'error');
+            }
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+loadCategories();
+</script>
+{% endblock %}

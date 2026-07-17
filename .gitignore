@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+instance/
+*.db
+.qr_order.db
+temp/
+.DS_Store

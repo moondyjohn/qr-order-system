@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}首頁 - 二維碼掃碼點餐系統{% endblock %}
+{% block extra_head %}
+<style>
+.btn-qr {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 20px;
+    background: var(--primary-bg);
+    color: var(--primary);
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+}
+.btn-qr:hover { background: var(--primary); color: white; }
+
+.qr-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.qr-modal.active { display: flex; }
+.qr-content {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+    animation: modalIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.qr-content img {
+    max-width: 100%;
+    height: auto;
+    margin: 16px 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+}
+.qr-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+.qr-actions button { flex: 1; }
+
+/* ===== 搜尋欄 ===== */
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 10px 16px;
+    background: var(--bg-warm);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.search-bar:focus-within {
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+}
+.search-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--text-light);
+}
+.search-bar:focus-within .search-icon {
+    color: var(--primary);
+}
+.search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: inherit;
+    letter-spacing: 0.5px;
+}
+.search-input::placeholder {
+    color: #C0BAB4;
+    font-weight: 400;
+}
+.no-match-msg {
+    display: none;
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-light);
+    font-size: 15px;
+    font-weight: 500;
+}
+</style>
+{% endblock %}
+{% block body %}
+<nav class="navbar">
+    <a href="/" class="logo">QR 掃碼點餐</a>
+    <div class="nav-links">
+        <a href="/admin">管理後台</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="home-hero">
+        <h1>歡迎使用掃碼點餐</h1>
+        <p>選擇您的檯號，開始點餐</p>
+    </div>
+
+    {% if tables %}
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">選擇檯號</div>
+            <div style="color: var(--text-light); font-size: 14px; font-weight: 600;">共 {{ tables|length }} 桌</div>
+        </div>
+
+        <!-- 搜尋欄 -->
+        <div class="search-bar">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" class="search-input" inputmode="numeric" pattern="[0-9]*" placeholder="輸入台號搜尋..." id="tableSearch" autocomplete="off">
+        </div>
+
+        <div class="table-grid">
+            {% for t in tables %}
+            <div class="table-card" id="table-{{ t.table_number }}">
+                <a href="/order/{{ t.table_number }}?ref=home" class="table-link">
+                    <div class="table-icon">
+                        <span class="table-icon-num">{{ t.table_number }}</span>
+                    </div>
+                    <div class="table-number">{{ t.table_number }} 號桌</div>
+                    <span class="status-badge status-idle" id="badge-{{ t.table_number }}">閒置</span>
+                </a>
+                <div class="table-actions">
+                    <button class="btn-qr" onclick="showQRCode({{ t.table_number }})">
+                        📱 二維碼
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 無匹配提示 -->
+        <div class="no-match-msg" id="noMatchMsg">無匹配台號</div>
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; padding: 60px 20px;">
+        <div style="font-size: 52px; margin-bottom: 16px;">📋</div>
+        <p style="color: var(--text-light); font-size: 15px;">暫無台號，請先在管理後台添加</p>
+        <a href="/admin/tables" class="btn btn-primary" style="margin-top: 16px;">去添加台號</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 二維碼彈窗 -->
+<div class="qr-modal" id="qrModal">
+    <div class="qr-content">
+        <h3 id="qrTitle" style="font-size:18px;">台號二維碼</h3>
+        <img id="qrImage" src="" alt="台號二維碼">
+        <p style="font-size: 13px; color: var(--text-light); word-break: break-all;" id="qrUrl"></p>
+        <div class="qr-actions">
+            <button class="btn btn-success" onclick="downloadQR()">下載二維碼</button>
+            <button class="btn btn-outline" onclick="closeQR()">關閉</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// ===== 台號搜尋功能 =====
+(function() {
+    const searchInput = document.getElementById('tableSearch');
+    const noMatchMsg = document.getElementById('noMatchMsg');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        const cards = document.querySelectorAll('.table-card');
+        let visibleCount = 0;
+        let firstVisible = null;
+
+        cards.forEach(function(card) {
+            const numEl = card.querySelector('.table-icon-num');
+            if (!numEl) return;
+            const tableNum = numEl.textContent.trim().toLowerCase();
+            if (!query || tableNum.includes(query)) {
+                card.style.display = '';
+                visibleCount++;
+                if (!firstVisible) firstVisible = card;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (visibleCount === 0 && query) {
+            noMatchMsg.style.display = 'block';
+        } else {
+            noMatchMsg.style.display = 'none';
+        }
+
+        // 僅有一個匹配時自動滾動
+        if (visibleCount === 1 && firstVisible) {
+            firstVisible.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+})();
+
+const STATUS_MAP = {
+    '閒置': { cls: 'status-idle', text: '閒置' },
+    '下單': { cls: 'status-pending', text: '下單' },
+    '確認': { cls: 'status-confirmed', text: '確認' },
+    '結賬': { cls: 'status-completed', text: '結賬' },
+    '取消': { cls: 'status-cancelled', text: '取消' }
+};
+
+fetch('/api/admin/tables')
+    .then(r => r.json())
+    .then(data => {
+        data.forEach(t => {
+            const badge = document.getElementById('badge-' + t.table_number);
+            if (badge) {
+                const info = STATUS_MAP[t.status] || STATUS_MAP['閒置'];
+                badge.className = 'status-badge ' + info.cls;
+                badge.textContent = info.text;
+            }
+        });
+        setTimeout(() => location.reload(), 10000);
+    })
+    .catch(() => {});
+
+function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+let currentQRImage = '', currentQRUrl = '', currentTableNumber = '';
+
+function showQRCode(tableNumber) {
+    currentTableNumber = tableNumber;
+    fetch('/api/admin/tables')
+        .then(r => r.json())
+        .then(tables => {
+            const table = tables.find(t => t.table_number == tableNumber);
+            if (!table) { alert('未找到台號信息'); return; }
+            currentQRImage = table.qr_code;
+            currentQRUrl = table.order_url;
+            document.getElementById('qrTitle').textContent = `${tableNumber} 號桌二維碼`;
+            document.getElementById('qrImage').src = currentQRImage;
+            document.getElementById('qrUrl').textContent = currentQRUrl;
+            document.getElementById('qrModal').classList.add('active');
+        })
+        .catch(err => alert('獲取二維碼失敗: ' + err));
+}
+
+function closeQR() {
+    document.getElementById('qrModal').classList.remove('active');
+    currentQRImage = ''; currentQRUrl = ''; currentTableNumber = '';
+}
+
+function downloadQR() {
+    if (!currentQRImage) return;
+    const link = document.createElement('a');
+    link.download = `台號${currentTableNumber}二維碼.png`;
+    link.href = currentQRImage;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block title %}檯號管理 - 二維碼掃碼點餐系統{% endblock %}
+{% block extra_head %}
+<style>
+.table-manage-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-light);
+    transition: var(--transition);
+}
+.table-manage-card:hover { box-shadow: var(--shadow-md); }
+
+.table-manage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.table-manage-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.table-qr-code {
+    text-align: center;
+    margin: 16px 0;
+}
+
+.table-qr-code img {
+    max-width: 180px;
+    height: auto;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    background: white;
+}
+
+.table-manage-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.order-url-link {
+    display: block;
+    text-align: center;
+    margin-bottom: 10px;
+    color: var(--info);
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+}
+
+.last-order {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+</style>
+{% endblock %}
+{% block body %}
+<nav class="navbar">
+    <a href="/" class="logo">QR 掃碼點餐</a>
+    <div class="nav-links">
+        <a href="/admin">管理</a>
+        <a href="/admin/dishes">菜式</a>
+        <a href="/admin/tables" class="active">台號</a>
+        <a href="/admin/orders">訂單</a>
+        <a href="/admin/reports">報表</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">檯號管理</div>
+            <div style="color: var(--text-light); font-size: 14px; font-weight: 600;">
+                共 <span id="tableCount">0</span> 桌
+            </div>
+        </div>
+
+        <div class="form-inline" style="margin-bottom:10px;">
+            <input type="text" class="form-control" id="tableNumberInput"
+                   placeholder="輸入台號，如：A01、101" maxlength="20">
+            <button class="btn btn-primary" onclick="addTable()">添加台號</button>
+        </div>
+
+        <div class="form-inline">
+            <input type="text" class="form-control" id="batchRangeInput"
+                   placeholder="批量生成，如：1001-1012" maxlength="20">
+            <button class="btn btn-outline" onclick="batchAddTables()">批量生成</button>
+        </div>
+
+        <div style="margin-top: 16px; font-size: 12px; color: var(--text-light); display: flex; gap: 16px; flex-wrap: wrap;">
+            <span>狀態說明：</span>
+            <span><span class="status-badge status-idle">閒置</span> 無活躍訂單</span>
+            <span><span class="status-badge status-pending">下單</span> 有未處理訂單</span>
+            <span><span class="status-badge status-confirmed">確認</span> 訂單已確認</span>
+        </div>
+    </div>
+
+    <div id="tablesContainer" class="grid-2"></div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <div class="modal-title">確認刪除</div>
+        <div class="modal-body">
+            確定要刪除台號 <strong><span id="deleteTableNumber"></span></strong> 嗎？
+            <p style="font-size:13px;color:var(--text-light);margin-top:8px;">刪除後該台號的二維碼將失效。</p>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" onclick="confirmDelete()">確認刪除</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="checkoutModal">
+    <div class="modal">
+        <div class="modal-title">台號結賬</div>
+        <div class="modal-body">
+            確定要為台號 <strong><span id="checkoutTableNumber"></span></strong> 結賬嗎？
+            <p style="font-size:13px;color:var(--text-light);margin-top:8px;">結賬後該桌所有訂單將標記為已完成，狀態恢復為「閒置」。</p>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeCheckoutModal()">取消</button>
+            <button class="btn btn-success" onclick="confirmCheckout()">確認結賬</button>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+<div id="toast-container"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+let tables = [];
+let deleteTableId = null;
+let checkoutTableId = null;
+
+const STATUS_MAP = {
+    '閒置': { cls: 'status-idle', text: '閒置' },
+    '下單': { cls: 'status-pending', text: '下單' },
+    '確認': { cls: 'status-confirmed', text: '確認' }
+};
+
+function loadTables() {
+    fetch('/api/admin/tables')
+        .then(r => r.json())
+        .then(data => {
+            tables = data;
+            document.getElementById('tableCount').textContent = data.length;
+            renderTables(data);
+        })
+        .catch(err => showAlert('載入台號失敗: ' + err, 'danger'));
+}
+
+function renderTables(data) {
+    const container = document.getElementById('tablesContainer');
+    if (data.length === 0) {
+        container.innerHTML = `
+            <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 20px;">
+                <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#FFF5F0,#FFECE0);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 14px rgba(255,107,53,0.15);"><span style="font-size:32px;font-weight:800;color:#FF6B35;">桌</span></div>
+                <p style="color:var(--text-light);">暫無台號，請先添加台號</p>
+            </div>`;
+        return;
+    }
+    container.innerHTML = data.map(t => {
+        const status = STATUS_MAP[t.status] || STATUS_MAP['閒置'];
+        return `
+            <div class="table-manage-card">
+                <div class="table-manage-header">
+                    <div class="table-manage-title">${t.table_number} 號桌</div>
+                    <span class="status-badge ${status.cls}">${status.text}</span>
+                </div>
+                <div class="table-qr-code">
+                    <img src="${t.qr_code}" alt="二維碼">
+                </div>
+                <a href="${t.order_url}" target="_blank" class="order-url-link">${t.order_url}</a>
+                <div class="table-manage-actions">
+                    <a href="${t.order_url}" target="_blank" class="btn btn-info btn-sm" style="flex:1;">查看點餐頁</a>
+                    <button class="btn btn-success btn-sm" onclick="openCheckoutModal(${t.id}, '${t.table_number}')"
+                            ${t.status === '閒置' ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>結賬</button>
+                    <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${t.id}, '${t.table_number}')">刪除</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function addTable() {
+    const input = document.getElementById('tableNumberInput');
+    const tableNumber = input.value.trim();
+    if (!tableNumber) { showAlert('請輸入台號', 'warning'); return; }
+
+    fetch('/api/admin/tables', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({table_number: tableNumber})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { showAlert(`台號「${tableNumber}」添加成功`); input.value = ''; loadTables(); }
+        else showAlert(data.error || '添加失敗', 'danger');
+    })
+    .catch(() => showAlert('網絡錯誤', 'danger'));
+}
+
+function batchAddTables() {
+    const input = document.getElementById('batchRangeInput');
+    const range = input.value.trim();
+    if (!range || !range.includes('-')) { showAlert('請輸入正確格式，如：1001-1012', 'warning'); return; }
+
+    fetch('/api/admin/tables/batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({range: range})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(`生成成功: ${data.created_count} 個，跳過: ${data.skipped_count} 個`);
+            input.value = ''; loadTables();
+        } else showAlert(data.error || '批量生成失敗', 'danger');
+    })
+    .catch(() => showAlert('網絡錯誤', 'danger'));
+}
+
+function openDeleteModal(id, tableNumber) {
+    deleteTableId = id;
+    document.getElementById('deleteTableNumber').textContent = tableNumber;
+    document.getElementById('deleteModal').classList.add('active');
+}
+
+function closeDeleteModal() { deleteTableId = null; document.getElementById('deleteModal').classList.remove('active'); }
+
+function confirmDelete() {
+    if (!deleteTableId) return;
+    fetch(`/api/admin/tables/${deleteTableId}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { showAlert('台號刪除成功'); loadTables(); }
+            else showAlert(data.error || '刪除失敗', 'danger');
+            closeDeleteModal();
+        })
+        .catch(() => { showAlert('網絡錯誤', 'danger'); closeDeleteModal(); });
+}
+
+function openCheckoutModal(id, tableNumber) {
+    checkoutTableId = id;
+    document.getElementById('checkoutTableNumber').textContent = tableNumber;
+    document.getElementById('checkoutModal').classList.add('active');
+}
+
+function closeCheckoutModal() { checkoutTableId = null; document.getElementById('checkoutModal').classList.remove('active'); }
+
+function confirmCheckout() {
+    if (!checkoutTableId) return;
+    fetch(`/api/table/${checkoutTableId}/checkout`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { showAlert(data.message); loadTables(); }
+            else showAlert(data.error || '結賬失敗', 'danger');
+            closeCheckoutModal();
+        })
+        .catch(() => { showAlert('網絡錯誤', 'danger'); closeCheckoutModal(); });
+}
+
+function showAlert(message, type = 'success') {
+    const container = document.getElementById('alertContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.textContent = message;
+    container.appendChild(alert);
+    setTimeout(() => alert.remove(), 3000);
+}
+
+function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+document.addEventListener('DOMContentLoaded', loadTables);
+setInterval(loadTables, 10000);
+</script>
+{% endblock %}

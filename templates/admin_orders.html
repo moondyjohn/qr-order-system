@@ -1,0 +1,147 @@
+{% extends "admin.html" %}
+{% block title %}訂單管理 - 管理後台{% endblock %}
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📦 訂單管理</div>
+        <div class="filter-bar" style="margin-bottom:0;">
+            <select class="form-control" id="statusFilter" style="width:140px;" onchange="loadOrders()">
+                <option value="">全部狀態</option>
+                <option value="pending">待處理</option>
+                <option value="confirmed">已確認</option>
+                <option value="completed">已完成</option>
+                <option value="cancelled">已取消</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="orderList">
+        <p style="text-align:center;color:var(--text-light);padding:40px 0;">載入中...</p>
+    </div>
+</div>
+
+<!-- 訂單詳情彈窗 -->
+<div class="modal-overlay" id="orderModal">
+    <div class="modal" style="max-width:520px;">
+        <div class="modal-title">訂單詳情</div>
+        <div id="orderDetailContent"></div>
+        <div class="modal-actions" id="orderModalActions"></div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+const statusMap = {
+    'pending': {label:'待處理', cls:'badge-pending'},
+    'confirmed': {label:'已確認', cls:'badge-confirmed'},
+    'completed': {label:'已完成', cls:'badge-completed'},
+    'cancelled': {label:'已取消', cls:'badge-cancelled'}
+};
+
+function loadOrders() {
+    const status = document.getElementById('statusFilter').value;
+    let url = '/api/admin/orders';
+    if (status) url += `?status=${status}`;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('orderList');
+            if (data.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:40px 0;">暫無訂單</p>';
+                return;
+            }
+            list.innerHTML = data.map(o => {
+                const s = statusMap[o.status] || statusMap.pending;
+                return `
+                <div class="card" style="margin-bottom:12px;padding:16px;cursor:pointer;" onclick="showOrderDetail(${o.id})">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                        <div>
+                            <strong style="font-size:16px;">訂單 #${o.id}</strong>
+                            <span style="margin-left:12px;color:var(--text-light);font-size:13px;">${o.table_number}號桌</span>
+                        </div>
+                        <span class="badge ${s.cls}">${s.label}</span>
+                    </div>
+                    <div style="margin-top:8px;font-size:14px;color:var(--text-light);">
+                        共 ${o.items.length} 件商品 · 合計
+                        <span style="color:var(--danger);font-weight:700;font-size:16px;">$${o.total_price.toFixed(2)}</span>
+                    </div>
+                    <div style="margin-top:4px;font-size:12px;color:var(--text-light);">${o.created_at}</div>
+                    ${o.remark ? `<div style="margin-top:8px;font-size:13px;color:#666;background:#f5f5f5;padding:8px 12px;border-radius:6px;">備註：${o.remark}</div>` : ''}
+                </div>
+                `;
+            }).join('');
+        });
+}
+
+function showOrderDetail(orderId) {
+    fetch('/api/admin/orders').then(r=>r.json()).then(data => {
+        const o = data.find(x => x.id === orderId);
+        if (!o) return;
+        const s = statusMap[o.status] || statusMap.pending;
+        document.getElementById('orderDetailContent').innerHTML = `
+            <div style="margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong>訂單 #${o.id}</strong>
+                    <span class="badge ${s.cls}">${s.label}</span>
+                </div>
+                <div style="font-size:13px;color:var(--text-light);margin-top:4px;">${o.table_number}號桌 · ${o.created_at}</div>
+            </div>
+            <div style="background:#fafafa;border-radius:8px;padding:12px;">
+                <div style="font-weight:600;margin-bottom:8px;">菜式明細</div>
+                ${o.items.map(i => `
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:14px;">
+                        <span>${i.dish_name} × ${i.quantity}</span>
+                        <span style="font-weight:600;">$${(i.unit_price * i.quantity).toFixed(2)}</span>
+                    </div>
+                `).join('')}
+                <div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:700;font-size:16px;">
+                    <span>合計</span><span style="color:var(--danger);">$${o.total_price.toFixed(2)}</span>
+                </div>
+            </div>
+            ${o.remark ? `<div style="margin-top:12px;font-size:13px;"><strong>備註：</strong>${o.remark}</div>` : ''}
+        `;
+        // 操作按钮
+        let btns = `<button class="btn btn-info btn-sm" onclick="printOrder(${o.id})">🖨 打印</button>`;
+        if (o.status === 'pending') {
+            btns += `<button class="btn btn-success" onclick="updateStatus(${o.id}, 'confirmed')">確認接單</button>
+                     <button class="btn btn-danger" onclick="updateStatus(${o.id}, 'cancelled')">取消訂單</button>`;
+        } else if (o.status === 'confirmed') {
+            btns += `<button class="btn btn-success" onclick="updateStatus(${o.id}, 'completed')">完成訂單</button>`;
+        }
+        btns += `<button class="btn btn-outline" onclick="closeOrderModal()" style="margin-left:auto;">關閉</button>`;
+        document.getElementById('orderModalActions').innerHTML = btns;
+        document.getElementById('orderModal').classList.add('active');
+    });
+}
+
+function printOrder(orderId) {
+    window.open('/print/order/' + orderId, '_blank', 'width=400,height=600');
+}
+
+function closeOrderModal() {
+    document.getElementById('orderModal').classList.remove('active');
+}
+
+function updateStatus(orderId, status) {
+    fetch(`/api/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('狀態已更新');
+            closeOrderModal();
+            loadOrders();
+        } else {
+            showToast(data.error || '操作失敗', 'error');
+        }
+    });
+}
+
+loadOrders();
+</script>
+{% endblock %}

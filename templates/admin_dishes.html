@@ -1,0 +1,218 @@
+{% extends "admin.html" %}
+{% block title %}菜式管理 - 管理後台{% endblock %}
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📋 菜式管理</div>
+        <button class="btn btn-primary" onclick="openDishModal()">+ 添加菜式</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>圖片</th>
+                    <th>菜名</th>
+                    <th>分類</th>
+                    <th>價格</th>
+                    <th>庫存</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="dishTableBody">
+                <tr><td colspan="8" style="text-align:center;color:var(--text-light);">載入中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 添加/編輯菜式彈窗 -->
+<div class="modal-overlay" id="dishModal">
+    <div class="modal" style="max-width: 640px;">
+        <div class="modal-title" id="dishModalTitle">添加菜式</div>
+        <form id="dishForm" enctype="multipart/form-data">
+            <input type="hidden" id="dishId" value="">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>菜式名稱 *</label>
+                    <input type="text" class="form-control" id="dishName" required placeholder="如：宫保鸡丁">
+                </div>
+                <div class="form-group">
+                    <label>分類 *</label>
+                    <select class="form-control" id="dishCategory">
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>價格 (元) *</label>
+                    <input type="number" class="form-control" id="dishPrice" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>庫存 (0=無限)</label>
+                    <input type="number" class="form-control" id="dishStock" min="0" value="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>菜式描述</label>
+                <textarea class="form-control" id="dishDesc" placeholder="簡要描述菜式..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>菜式圖片</label>
+                <div class="image-upload-area" id="imageUploadArea">
+                    <input type="file" id="dishImage" accept="image/*">
+                    <div id="imagePreview">
+                        <span style="font-size: 32px;">📷</span>
+                        <p style="color:var(--text-light);font-size:13px;">點擊上傳菜式圖片</p>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="dishAvailable" checked>
+                    上架售賣
+                </label>
+            </div>
+        </form>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeDishModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveDish()">保存</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+function loadDishes() {
+    fetch('/api/admin/dishes')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('dishTableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light);">暫無菜式，點擊右上角添加</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(d => `
+                <tr>
+                    <td>${d.id}</td>
+                    <td>
+                        ${d.image_path
+                            ? `<img src="${d.image_path}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;">`
+                            : '<span style="color:var(--text-light);">無圖</span>'}
+                    </td>
+                    <td><strong>${d.name}</strong></td>
+                    <td>${d.category_name}</td>
+                    <td style="color:var(--danger);font-weight:600;">$${d.price.toFixed(2)}</td>
+                    <td>${d.stock === 0 ? '無限' : d.stock}</td>
+                    <td>
+                        <span class="badge ${d.is_available ? 'badge-completed' : 'badge-cancelled'}">
+                            ${d.is_available ? '上架' : '下架'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="editDish(${d.id})">編輯</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDish(${d.id})" style="margin-left:4px;">刪除</button>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function openDishModal() {
+    document.getElementById('dishModalTitle').textContent = '添加菜式';
+    document.getElementById('dishId').value = '';
+    document.getElementById('dishForm').reset();
+    document.getElementById('dishAvailable').checked = true;
+    document.getElementById('imagePreview').innerHTML = '<span style="font-size:32px;">📷</span><p style="color:var(--text-light);font-size:13px;">點擊上傳菜式圖片</p>';
+    document.getElementById('dishModal').classList.add('active');
+}
+
+function closeDishModal() {
+    document.getElementById('dishModal').classList.remove('active');
+}
+
+function editDish(id) {
+    fetch('/api/admin/dishes').then(r => r.json()).then(data => {
+        const d = data.find(x => x.id === id);
+        if (!d) return;
+        document.getElementById('dishModalTitle').textContent = '編輯菜式';
+        document.getElementById('dishId').value = d.id;
+        document.getElementById('dishName').value = d.name;
+        document.getElementById('dishCategory').value = d.category_id;
+        document.getElementById('dishPrice').value = d.price;
+        document.getElementById('dishStock').value = d.stock;
+        document.getElementById('dishDesc').value = d.description || '';
+        document.getElementById('dishAvailable').checked = d.is_available;
+        if (d.image_path) {
+            document.getElementById('imagePreview').innerHTML = `<img src="${d.image_path}" class="preview-img">`;
+        }
+        document.getElementById('dishModal').classList.add('active');
+    });
+}
+
+function saveDish() {
+    const id = document.getElementById('dishId').value;
+    const name = document.getElementById('dishName').value.trim();
+    if (!name) { showToast('請輸入菜式名稱', 'warning'); return; }
+    const price = parseFloat(document.getElementById('dishPrice').value);
+    if (isNaN(price) || price < 0) { showToast('請輸入有效價格', 'warning'); return; }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('category_id', document.getElementById('dishCategory').value);
+    formData.append('price', price);
+    formData.append('stock', parseInt(document.getElementById('dishStock').value) || 0);
+    formData.append('description', document.getElementById('dishDesc').value);
+    formData.append('is_available', document.getElementById('dishAvailable').checked);
+    const imgFile = document.getElementById('dishImage').files[0];
+    if (imgFile) formData.append('image', imgFile);
+
+    const url = id ? `/api/admin/dishes/${id}` : '/api/admin/dishes';
+    const method = id ? 'PUT' : 'POST';
+
+    fetch(url, { method, body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { showToast(id ? '修改成功' : '添加成功'); closeDishModal(); loadDishes(); }
+            else showToast(data.error || '操作失敗', 'error');
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+function deleteDish(id) {
+    if (!confirm('確定刪除該菜式嗎？')) return;
+    fetch(`/api/admin/dishes/${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || '刪除成功', data.action === 'soft_delete' ? 'warning' : 'success');
+                loadDishes();
+            } else {
+                showToast(data.error || '刪除失敗', 'error');
+            }
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+// 圖片預覽
+document.getElementById('dishImage').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            document.getElementById('imagePreview').innerHTML = `<img src="${ev.target.result}" class="preview-img">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+loadDishes();
+</script>
+{% endblock %}

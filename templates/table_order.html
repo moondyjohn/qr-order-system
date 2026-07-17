@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+{% block title %}點餐 - {{ table.table_number }}號桌{% endblock %}
+{% block extra_head %}
+<style>
+body { padding-bottom: 90px; }
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.table-info h2 { margin: 0; font-size: 22px; font-weight: 800; }
+
+.table-info .sub { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+
+.table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 當前訂單面板 */
+.current-order-panel {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin: 0 12px 20px;
+    border: 1px solid var(--border-light);
+}
+
+.current-order-panel h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.current-order-panel .order-summary {
+    text-align: right;
+    padding: 12px 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text);
+    border-top: 1px solid var(--border-light);
+    margin-top: 8px;
+}
+
+.current-order-panel .order-summary span {
+    font-size: 22px;
+    color: var(--danger);
+}
+
+.current-order-panel .btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+/* 加菜遮罩漸變 */
+.add-dish-prompt {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-light);
+}
+
+.add-dish-prompt .icon { font-size: 56px; margin-bottom: 16px; }
+
+/* 下單成功提示 */
+.redirect-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--primary);
+    color: white;
+    padding: 18px 40px;
+    border-radius: var(--radius);
+    font-size: 20px;
+    font-weight: 800;
+    z-index: 300;
+    box-shadow: var(--shadow-lg);
+    animation: toastPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 菜式分類標题 */
+.dish-section-title {
+    margin: 24px 0 14px;
+    font-size: 14px;
+    color: var(--text-light);
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+/* 無訂單提示 */
+.no-orders {
+    text-align: center;
+    color: var(--text-light);
+    padding: 16px;
+    font-size: 13px;
+}
+
+/* 當前訂單中的菜式项 */
+.order-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.order-item-row .item-info { display: flex; align-items: center; gap: 8px; }
+
+.order-item-row .item-name { font-weight: 600; font-size: 14px; }
+
+.order-item-row .item-qty {
+    background: #F0EBE5;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.order-item-row .item-price {
+    font-weight: 700;
+    color: var(--text);
+}
+</style>
+{% endblock %}
+{% block body %}
+<nav class="navbar">
+    <a href="/" class="logo">QR 掃碼點餐</a>
+    <div style="font-size: 14px; font-weight: 600; opacity: 0.9;">
+        {{ table.table_number }} 號桌
+    </div>
+</nav>
+
+<div class="table-header">
+    <div class="table-info">
+        <h2>{{ table.table_number }} 號桌</h2>
+        <div class="sub">掃碼點餐，方便快捷</div>
+    </div>
+    <div class="table-actions">
+        {% if request.args.get('ref') == 'home' %}
+        <a href="/" class="btn btn-outline btn-sm">返回首頁</a>
+        {% endif %}
+        <button class="btn btn-primary" onclick="checkoutTable()">結賬</button>
+        <button class="btn btn-info btn-sm" onclick="showQRCode()">二維碼</button>
+        <button class="btn btn-outline btn-sm" onclick="printCurrentOrder()">🖨 打印</button>
+    </div>
+</div>
+
+<div class="redirect-toast" id="redirectToast" style="display:none;">下單成功！</div>
+
+<div class="order-page">
+    <!-- 當前訂單面板（掃碼入口下單後顯示） -->
+    <div class="current-order-panel" id="currentOrderSection" style="display:none;">
+        <h3>當前訂單</h3>
+        <div id="currentOrderList"></div>
+        <div class="order-summary">
+            合計 <span id="currentOrderTotal">0.00</span>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-info" onclick="showAddDish()">加菜</button>
+            <button class="btn btn-outline" onclick="printCurrentOrder()">🖨 打印小票</button>
+            <button class="btn btn-primary" onclick="checkoutTable()">結賬</button>
+        </div>
+    </div>
+
+    <!-- 历史訂單記錄 -->
+    <div class="orders-section" id="ordersSection" style="display:none;">
+        <h3>本桌訂單記錄</h3>
+        <div id="ordersList"></div>
+    </div>
+
+    <!-- 菜式列表 -->
+    <div id="dishListContainer" style="display:none;">
+        <div class="category-nav" id="categoryNav">
+            <a href="#all" class="active" data-cat="all">全部</a>
+            {% for cat in categories.keys() %}
+            <a href="#cat-{{ cat.id }}" data-cat="{{ cat.id }}">{{ cat.name }}</a>
+            {% endfor %}
+        </div>
+
+        <div style="padding: 12px 0;">
+            {% for cat, dishes in categories.items() %}
+            <div class="dish-section" id="cat-{{ cat.id }}">
+                <div class="dish-section-title">{{ cat.name }}</div>
+                <div class="dish-grid">
+                    {% for dish in dishes %}
+                    <div class="dish-card" data-dish-id="{{ dish.id }}" data-category="{{ cat.id }}">
+                        {% if dish.image_path %}
+                        <img src="{{ dish.image_path }}" alt="{{ dish.name }}" class="dish-img">
+                        {% else %}
+                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">🍽</div>
+                        {% endif %}
+                        <div class="dish-info">
+                            <div class="dish-name">{{ dish.name }}</div>
+                            <div class="dish-desc">{{ dish.description or '美味可口，值得品嚐' }}</div>
+                            <div class="dish-bottom">
+                                <div class="dish-price">{{ "%.2f"|format(dish.price) }}</div>
+                                <div class="quantity-ctrl">
+                                    <button onclick="changeQty({{ dish.id }}, -1)">−</button>
+                                    <span class="qty-num" id="qty-{{ dish.id }}">0</span>
+                                    <button onclick="changeQty({{ dish.id }}, 1)">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div style="text-align:center;padding:60px 20px;color:var(--text-light);">
+                <div style="font-size:56px;margin-bottom:16px;">🍽</div>
+                暫無菜式，請聯繫商家添加
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 購物車底栏 -->
+    <div class="cart-bar" id="cartBar" style="display:none;">
+        <div class="cart-info">
+            <div class="cart-badge" id="cartCount">0</div>
+            <div>
+                <div style="font-size:12px;color:var(--text-light);">已選 <span id="cartItemCount">0</span> 件</div>
+                <div class="cart-total" id="cartTotal">0.00</div>
+            </div>
+        </div>
+        <button class="btn btn-primary btn-lg" onclick="submitOrder()">提交加菜</button>
+    </div>
+
+    <!-- 備註彈窗 -->
+    <div class="modal-overlay" id="remarkModal">
+        <div class="modal">
+            <div class="modal-title">添加備註（可選）</div>
+            <div class="form-group">
+                <textarea class="form-control" id="remarkInput" placeholder="如：少辣、不要香菜..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeRemark()">跳過</button>
+                <button class="btn btn-primary" onclick="confirmOrder()">確認下單</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結賬確認彈窗 -->
+    <div class="modal-overlay" id="checkoutConfirmModal">
+        <div class="modal">
+            <div class="modal-title">確認結賬</div>
+            <div class="modal-body">
+                <p>確定要為 <strong>{{ table.table_number }} 號桌</strong> 結賬嗎？</p>
+                <p style="font-size:13px;color:var(--text-light);">結賬後該桌所有未完成訂單將標記為已完成。</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeCheckoutConfirm()">取消</button>
+                <button class="btn btn-outline" onclick="printCurrentOrder()">🖨 打印小票</button>
+                <button class="btn btn-success" onclick="confirmCheckout()">確認結賬</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 二維碼彈窗 -->
+    <div class="modal-overlay" id="qrModal">
+        <div class="modal" style="text-align:center;">
+            <h3 style="margin-bottom:16px;">{{ table.table_number }} 號桌二維碼</h3>
+            <img id="qrImage" src="" alt="台號二維碼" style="max-width:100%;border:1px solid var(--border-light);border-radius:8px;margin:12px 0;">
+            <p style="font-size:13px;color:var(--text-light);word-break:break-all;" id="qrUrl"></p>
+            <div class="modal-actions" style="justify-content:center;">
+                <button class="btn btn-success" onclick="downloadQR()">下載二維碼</button>
+                <button class="btn btn-outline" onclick="closeQR()">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let cart = {};
+const tableNumber = "{{ table.table_number }}";
+const fromHome = {{ 'true' if request.args.get('ref') == 'home' else 'false' }};
+
+const STATUS_TEXT = {
+    'pending': '待處理', 'confirmed': '已確認',
+    'completed': '已完成', 'cancelled': '已取消'
+};
+
+let currentOrderItems = [];
+let currentOrderTotal = 0;
+let currentOrderId = null;
+
+// 頁面加載：獲取該桌已有訂單
+fetch('/api/order/' + tableNumber + '/orders')
+    .then(r => r.json())
+    .then(orders => {
+        if (orders.length > 0) {
+            document.getElementById('ordersSection').style.display = 'block';
+            const listEl = document.getElementById('ordersList');
+            orders.forEach(o => {
+                const itemsText = o.items.map(i => i.dish_name + '×' + i.quantity).join('、');
+                listEl.innerHTML += `
+                    <div class="order-history-item ${o.status}">
+                        <div class="oh-header">
+                            <span class="oh-status">${STATUS_TEXT[o.status] || o.status}</span>
+                            <span class="oh-time">${o.created_at}</span>
+                        </div>
+                        <div class="oh-items">${itemsText}</div>
+                        ${o.remark ? '<div style="color:#999;font-size:11px;">備註: ' + o.remark + '</div>' : ''}
+                        <div class="oh-total">$${o.total_price.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+        }
+        if (!fromHome && orders.length > 0) {
+            const activeOrder = orders.find(o => o.status === 'pending' || o.status === 'confirmed');
+            if (activeOrder) {
+                currentOrderId = activeOrder.id;
+                currentOrderItems = activeOrder.items;
+                currentOrderTotal = activeOrder.total_price;
+                showCurrentOrder();
+            } else {
+                document.getElementById('dishListContainer').style.display = 'block';
+            }
+        } else if (!fromHome) {
+            document.getElementById('dishListContainer').style.display = 'block';
+        } else {
+            document.getElementById('dishListContainer').style.display = 'block';
+        }
+    })
+    .catch(() => {
+        document.getElementById('dishListContainer').style.display = 'block';
+    });
+
+// 分類导航
+document.querySelectorAll('#categoryNav a').forEach(a => {
+    a.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#categoryNav a').forEach(x => x.classList.remove('active'));
+        this.classList.add('active');
+        const cat = this.dataset.cat;
+        document.querySelectorAll('.dish-section').forEach(sec => {
+            sec.style.display = (cat === 'all' || sec.id === `cat-${cat}`) ? '' : 'none';
+        });
+    });
+});
+
+function changeQty(dishId, delta) {
+    if (!cart[dishId]) cart[dishId] = { name: '', price: 0, qty: 0 };
+    const card = document.querySelector(`[data-dish-id="${dishId}"]`);
+    const name = card.querySelector('.dish-name').textContent;
+    const price = parseFloat(card.querySelector('.dish-price').textContent);
+    cart[dishId].name = name;
+    cart[dishId].price = price;
+    cart[dishId].qty = Math.max(0, cart[dishId].qty + delta);
+    if (cart[dishId].qty === 0) delete cart[dishId];
+    document.getElementById(`qty-${dishId}`).textContent = cart[dishId] ? cart[dishId].qty : 0;
+    updateCart();
+}
+
+function updateCart() {
+    let total = 0, itemCount = 0;
+    Object.values(cart).forEach(c => { total += c.price * c.qty; itemCount += c.qty; });
+    const bar = document.getElementById('cartBar');
+    if (itemCount > 0) {
+        bar.style.display = 'flex';
+        document.getElementById('cartCount').textContent = itemCount;
+        document.getElementById('cartItemCount').textContent = itemCount;
+        document.getElementById('cartTotal').textContent = total.toFixed(2);
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function submitOrder() {
+    if (Object.keys(cart).length === 0) { showToast('請先選擇菜式', 'warning'); return; }
+    document.getElementById('remarkModal').classList.add('active');
+}
+
+function closeRemark() { document.getElementById('remarkModal').classList.remove('active'); }
+
+function confirmOrder() {
+    const items = Object.keys(cart).map(id => ({
+        dish_id: parseInt(id), quantity: cart[id].qty
+    }));
+    const cartSnapshot = {};
+    Object.keys(cart).forEach(id => { cartSnapshot[id] = {...cart[id]}; });
+
+    const remark = document.getElementById('remarkInput').value;
+    fetch(`/api/order/${tableNumber}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({items, remark})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            cart = {};
+            document.querySelectorAll('.qty-num').forEach(el => el.textContent = '0');
+            updateCart();
+            closeRemark();
+            document.getElementById('remarkInput').value = '';
+
+            if (fromHome) {
+                document.getElementById('redirectToast').style.display = 'block';
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+            } else {
+                currentOrderId = data.order_id;
+                const newItems = [];
+                if (data.order && data.order.items && data.order.items.length > 0) {
+                    newItems.push(...data.order.items);
+                } else {
+                    items.forEach(it => {
+                        const snap = cartSnapshot[it.dish_id];
+                        newItems.push({
+                            dish_name: snap ? snap.name : ('菜式#' + it.dish_id),
+                            quantity: it.quantity,
+                            price: snap ? snap.price : 0
+                        });
+                    });
+                }
+                const merged = {};
+                [...currentOrderItems, ...newItems].forEach(item => {
+                    const key = item.dish_name || '未知';
+                    if (merged[key]) {
+                        merged[key].quantity += (item.quantity || 0);
+                    } else {
+                        merged[key] = { dish_name: key, quantity: item.quantity || 0, price: item.price || 0 };
+                    }
+                });
+                currentOrderItems = Object.values(merged);
+                currentOrderTotal = currentOrderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+                showCurrentOrder();
+                showToast('加菜成功');
+                setTimeout(() => printCurrentOrder(), 600);
+            }
+        } else {
+            showToast(data.error || '下單失敗', 'error');
+        }
+    })
+    .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+function showCurrentOrder() {
+    const section = document.getElementById('currentOrderSection');
+    const listEl = document.getElementById('currentOrderList');
+    if (!currentOrderItems || currentOrderItems.length === 0) {
+        listEl.innerHTML = '<div class="no-orders">暫無菜式</div>';
+    } else {
+        listEl.innerHTML = currentOrderItems.map(item => `
+            <div class="order-item-row">
+                <div class="item-info">
+                    <span class="item-name">${item.dish_name || '未知菜式'}</span>
+                    <span class="item-qty">×${item.quantity || 0}</span>
+                </div>
+                <span class="item-price">$${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</span>
+            </div>
+        `).join('');
+    }
+    document.getElementById('currentOrderTotal').textContent = (currentOrderTotal || 0).toFixed(2);
+    section.style.display = 'block';
+    document.getElementById('dishListContainer').style.display = 'none';
+    document.getElementById('cartBar').style.display = 'none';
+}
+
+function showAddDish() {
+    cart = {};
+    document.querySelectorAll('.qty-num').forEach(el => el.textContent = '0');
+    updateCart();
+    document.getElementById('currentOrderSection').style.display = 'none';
+    document.getElementById('dishListContainer').style.display = 'block';
+    document.getElementById('dishListContainer').scrollIntoView({behavior: 'smooth'});
+}
+
+function checkoutTable() {
+    document.getElementById('checkoutConfirmModal').classList.add('active');
+}
+
+function closeCheckoutConfirm() {
+    document.getElementById('checkoutConfirmModal').classList.remove('active');
+}
+
+function confirmCheckout() {
+    closeCheckoutConfirm();
+    fetch('/api/admin/tables')
+        .then(r => r.json())
+        .then(tables => {
+            const table = tables.find(t => t.table_number === tableNumber);
+            if (!table) { showToast('未找到台號信息', 'error'); return; }
+            return fetch(`/api/table/${table.id}/checkout`, {method: 'POST'});
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.success) {
+                // 清空購物車
+                cart = {};
+                document.querySelectorAll('.qty-num').forEach(el => el.textContent = '0');
+                updateCart();
+                // 重置訂單狀態變量
+                currentOrderItems = [];
+                currentOrderTotal = 0;
+                currentOrderId = null;
+                // 隱藏當前訂單面板
+                document.getElementById('currentOrderSection').style.display = 'none';
+                document.getElementById('currentOrderList').innerHTML = '';
+                // 隱藏歷史訂單
+                document.getElementById('ordersSection').style.display = 'none';
+                document.getElementById('ordersList').innerHTML = '';
+                // 顯示菜式列表，重置為空白點餐狀態
+                document.getElementById('dishListContainer').style.display = 'block';
+                showToast('結賬成功，已重置');
+                if (fromHome) {
+                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                }
+            }
+        })
+        .catch(err => showToast('結賬失敗: ' + err, 'error'));
+}
+
+let currentQRImage = '', currentQRUrl = '';
+
+function showQRCode() {
+    fetch('/api/admin/tables')
+        .then(r => r.json())
+        .then(tables => {
+            const table = tables.find(t => t.table_number === tableNumber);
+            if (!table) { showToast('未找到台號信息', 'error'); return; }
+            currentQRImage = table.qr_code;
+            currentQRUrl = table.order_url;
+            document.getElementById('qrImage').src = currentQRImage;
+            document.getElementById('qrUrl').textContent = currentQRUrl;
+            document.getElementById('qrModal').classList.add('active');
+        })
+        .catch(err => showToast('獲取二維碼失敗: ' + err, 'error'));
+}
+
+function closeQR() {
+    document.getElementById('qrModal').classList.remove('active');
+    currentQRImage = ''; currentQRUrl = '';
+}
+
+function downloadQR() {
+    if (!currentQRImage) return;
+    const link = document.createElement('a');
+    link.download = `台號${tableNumber}二維碼.png`;
+    link.href = currentQRImage;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function printCurrentOrder() {
+    if (!currentOrderId) {
+        showToast('暫無訂單可供列印', 'warning');
+        return;
+    }
+    window.open('/print/order/' + currentOrderId, '_blank', 'width=400,height=600');
+}
+
+function showToast(msg, type='success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+</script>
+{% endblock %}

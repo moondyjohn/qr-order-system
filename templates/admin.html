@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}管理後台 - 二維碼掃碼點餐系統{% endblock %}
+{% block body %}
+<nav class="navbar">
+    <a href="/admin" class="logo">🍽 掃碼點餐 · 管理後台</a>
+    <div class="nav-links">
+        <a href="/">返回首頁</a>
+    </div>
+</nav>
+
+<div class="admin-sidebar">
+    <div class="sidebar">
+        <a href="/admin/dishes" class="{% if request.path == '/admin/dishes' %}active{% endif %}">📋 菜式管理</a>
+        <a href="/admin/categories" class="{% if request.path == '/admin/categories' %}active{% endif %}">📂 分類管理</a>
+        <a href="/admin/tables" class="{% if request.path == '/admin/tables' %}active{% endif %}">🪑 檯號管理</a>
+        <a href="/admin/orders" class="{% if request.path == '/admin/orders' %}active{% endif %}">📦 訂單管理</a>
+        <a href="/admin/reports" class="{% if request.path == '/admin/reports' %}active{% endif %}">📊 報表統計</a>
+    </div>
+    <div class="main-content">
+        {% block admin_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function showToast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+</script>
+{% endblock %}
