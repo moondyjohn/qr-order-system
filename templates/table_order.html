@@ -488,6 +488,7 @@ function closeCheckoutConfirm() {
 
 function confirmCheckout() {
     closeCheckoutConfirm();
+    const checkoutOrderId = currentOrderId;
     fetch('/api/admin/tables')
         .then(r => r.json())
         .then(tables => {
@@ -514,9 +515,15 @@ function confirmCheckout() {
                 document.getElementById('ordersList').innerHTML = '';
                 // 顯示菜式列表，重置為空白點餐狀態
                 document.getElementById('dishListContainer').style.display = 'block';
-                showToast('結賬成功，已重置');
+                showToast('結賬成功，正在打印...');
+                // 自動打印小票（調用電腦本機打印機）
+                if (checkoutOrderId) {
+                    setTimeout(() => {
+                        window.open('/print/order/' + checkoutOrderId, '_blank', 'width=400,height=600');
+                    }, 300);
+                }
                 if (fromHome) {
-                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                    setTimeout(() => { window.location.href = '/'; }, 3000);
                 }
             }
         })
