@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>鎵撳嵃灏忕エ - 瑷傚柈 #{{ order.id }}</title>
+    <title>打印小票 - 訂單 #{{ order.id }}</title>
     <style>
         * {
             margin: 0;
@@ -117,7 +117,7 @@
             margin-top: 4px;
         }
 
-        /* 鎵撳嵃鎺у埗 */
+        /* 打印控制 */
         @media print {
             html, body {
                 background: #fff;
@@ -138,7 +138,7 @@
             }
         }
 
-        /* 铻㈠箷涓婄殑闂滈枆鎻愮ず */
+        /* 螢幕上的關閉提示 */
         .close-hint {
             text-align: center;
             margin-top: 16px;
@@ -150,11 +150,11 @@
 </head>
 <body>
     <div class="receipt">
-        <div class="store-name">QR 鎺冪⒓榛為</div>
+        <div class="store-name">QR 掃碼點餐</div>
 
         <hr class="separator-double">
 
-        <div class="info-row">妾櫉锛歿{ table_number }}</div>
+        <div class="info-row">檯號：{{ table_number }}</div>
         <div class="info-row">{{ order_time }}</div>
 
         <hr class="separator">
@@ -162,7 +162,7 @@
         {% for item in items %}
         <div class="item-row">
             <span class="item-name">{{ item.dish_name }}</span>
-            <span class="item-detail">{{ item.quantity }} 脳 {{ "%.2f"|format(item.unit_price) }}</span>
+            <span class="item-detail">{{ item.quantity }} × {{ "%.2f"|format(item.unit_price) }}</span>
             <span class="item-subtotal">{{ "%.2f"|format(item.unit_price * item.quantity) }}</span>
         </div>
         {% endfor %}
@@ -170,22 +170,22 @@
         <hr class="separator">
 
         <div class="total-row">
-            <span>绺借▓</span>
+            <span>總計</span>
             <span class="total-amount">${{ "%.2f"|format(order.total_price) }}</span>
         </div>
 
         <div class="total-row" style="font-weight:normal;font-size:16px;margin-top:0;">
-            <span>鍏?{{ items|length }} 闋?/span>
+            <span>共 {{ items|length }} 項</span>
             <span></span>
         </div>
 
         <hr class="separator-double">
 
-        <div class="footer-text">鎰熻瑵鎯犻¨</div>
-        <div class="footer-sub">姝¤繋鍐嶆鍏夎嚚</div>
+        <div class="footer-text">感謝惠顧</div>
+        <div class="footer-sub">歡迎再次光臨</div>
     </div>
 
-    <div class="close-hint" id="closeHint">灏忕エ鍒楀嵃瀹岀暍寰岋紝瑕栫獥灏囪嚜鍕曢棞闁?/div>
+    <div class="close-hint" id="closeHint">小票列印完畢後，視窗將自動關閉</div>
 
     <script>
         (function() {
@@ -203,7 +203,7 @@
                 }
             };
 
-            // 鍌欑敤锛氳嫢 afterprint 鏈Ц鐧硷紝鐩ｈ伣 focus锛堢敤鎴跺垏鍥炶绐楄〃绀烘墦鍗板畬鎴愶級
+            // 備用：若 afterprint 未觸發，監聽 focus（用戶切回視窗表示打印完成）
             window.addEventListener('focus', function() {
                 if (printed) {
                     setTimeout(function() { window.close(); }, 500);

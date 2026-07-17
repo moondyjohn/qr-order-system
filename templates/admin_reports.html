@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}鍫辫〃绲辫▓ - 浜岀董纰兼巸纰奸粸椁愮郴绲眥% endblock %}
+{% extends "base.html" %}
+{% block title %}報表統計 - 二維碼掃碼點餐系統{% endblock %}
 {% block extra_head %}
 <style>
 .date-picker-group input[type="date"] {
@@ -88,67 +88,67 @@
 {% endblock %}
 {% block body %}
 <nav class="navbar">
-    <a href="/" class="logo">QR 鎺冪⒓榛為</a>
+    <a href="/" class="logo">QR 掃碼點餐</a>
     <div class="nav-links">
-        <a href="/admin">绠＄悊</a>
-        <a href="/admin/dishes">鑿滃紡</a>
-        <a href="/admin/tables">鍙拌櫉</a>
-        <a href="/admin/orders">瑷傚柈</a>
-        <a href="/admin/reports" class="active">鍫辫〃</a>
+        <a href="/admin">管理</a>
+        <a href="/admin/dishes">菜式</a>
+        <a href="/admin/tables">台號</a>
+        <a href="/admin/orders">訂單</a>
+        <a href="/admin/reports" class="active">報表</a>
     </div>
 </nav>
 
 <div class="container">
-    <h1 style="margin-bottom: 24px; font-size: 24px; font-weight: 800;">鐕熸キ鍫辫〃</h1>
+    <h1 style="margin-bottom: 24px; font-size: 24px; font-weight: 800;">營業報表</h1>
 
     <div class="date-picker-group">
         <div>
-            <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600;">閬告搰鏃ユ湡</label>
+            <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600;">選擇日期</label>
             <input type="date" id="datePicker">
         </div>
-        <button class="btn btn-primary" onclick="loadDailyReport()" style="align-self:flex-end;">鏌ョ湅鏃ュ牨</button>
+        <button class="btn btn-primary" onclick="loadDailyReport()" style="align-self:flex-end;">查看日報</button>
         <div style="margin-left:auto;display:flex;gap:10px;align-self:flex-end;">
-            <button class="btn btn-success" onclick="loadMonthlyReport()">鏌ョ湅鏈堝牨</button>
-            <button class="btn btn-outline" onclick="loadCurrentMonth()">鏈湀鏁告嵁</button>
+            <button class="btn btn-success" onclick="loadMonthlyReport()">查看月報</button>
+            <button class="btn btn-outline" onclick="loadCurrentMonth()">本月數据</button>
         </div>
     </div>
 
-    <!-- 鏃ュ牨 -->
+    <!-- 日報 -->
     <div id="dailyReport" class="chart-container">
-        <div class="chart-title">浠婃棩鐕熸キ绲辫▓</div>
-        <div id="dailyLoading" class="loading" style="padding:48px;">杓夊叆涓?..</div>
+        <div class="chart-title">今日營業統計</div>
+        <div id="dailyLoading" class="loading" style="padding:48px;">載入中...</div>
         <div id="dailyContent" style="display:none;">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-title">浠婃棩鐕熸キ椤?/div>
+                    <div class="stat-title">今日營業額</div>
                     <div class="stat-value" id="dailyAmount">$0.00</div>
                     <div class="stat-sub" id="dailyDate">2026-05-28</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">瑷傚柈鏁搁噺</div>
+                    <div class="stat-title">訂單數量</div>
                     <div class="stat-value" id="dailyOrders">0</div>
-                    <div class="stat-sub">宸插畬鎴愯▊鍠?/div>
+                    <div class="stat-sub">已完成訂單</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">鍞嚭鑿滃紡</div>
+                    <div class="stat-title">售出菜式</div>
                     <div class="stat-value" id="dailyDishes">0</div>
-                    <div class="stat-sub">鑿滃紡鏁搁噺</div>
+                    <div class="stat-sub">菜式數量</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">骞冲潎瀹㈠柈鍍?/div>
+                    <div class="stat-title">平均客單價</div>
                     <div class="stat-value" id="dailyAvg">$0.00</div>
-                    <div class="stat-sub">鍏?鍠?/div>
+                    <div class="stat-sub">元/單</div>
                 </div>
             </div>
 
-            <div class="chart-title" style="margin-top:28px;">鍒嗘檪娈电嚐妤</div>
+            <div class="chart-title" style="margin-top:28px;">分時段營業額</div>
             <div id="hourlyChart" style="overflow-x:auto;"></div>
 
-            <div class="chart-title" style="margin-top:28px;">浠婃棩瑷傚柈鏄庣粏</div>
+            <div class="chart-title" style="margin-top:28px;">今日訂單明细</div>
             <div class="table-wrapper">
                 <table id="dailyOrdersTable">
                     <thead>
-                        <tr><th>瑷傚柈铏?/th><th>鍙拌櫉</th><th>閲戦</th><th>鏅傞枔</th></tr>
+                        <tr><th>訂單號</th><th>台號</th><th>金額</th><th>時間</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -156,42 +156,42 @@
         </div>
     </div>
 
-    <!-- 鏈堝牨 -->
+    <!-- 月報 -->
     <div id="monthlyReport" class="chart-container" style="display:none;">
-        <div class="chart-title">鏈堝害鐕熸キ绲辫▓</div>
-        <div id="monthlyLoading" class="loading" style="padding:48px;">杓夊叆涓?..</div>
+        <div class="chart-title">月度營業統計</div>
+        <div id="monthlyLoading" class="loading" style="padding:48px;">載入中...</div>
         <div id="monthlyContent" style="display:none;">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-title">鏈湀鐕熸キ椤?/div>
+                    <div class="stat-title">本月營業額</div>
                     <div class="stat-value" id="monthlyAmount">$0.00</div>
-                    <div class="stat-sub" id="monthlyPeriod">2026骞?鏈?/div>
+                    <div class="stat-sub" id="monthlyPeriod">2026年5月</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">瑷傚柈绺芥暩</div>
+                    <div class="stat-title">訂單總數</div>
                     <div class="stat-value" id="monthlyOrders">0</div>
-                    <div class="stat-sub">宸插畬鎴愯▊鍠?/div>
+                    <div class="stat-sub">已完成訂單</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">鍞嚭鑿滃紡</div>
+                    <div class="stat-title">售出菜式</div>
                     <div class="stat-value" id="monthlyDishes">0</div>
-                    <div class="stat-sub">鑿滃紡绺芥暩</div>
+                    <div class="stat-sub">菜式總數</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">鐠版瘮澧為暦</div>
+                    <div class="stat-title">環比增長</div>
                     <div class="stat-value" id="growthRate" style="color:var(--text);">0%</div>
-                    <div class="stat-sub" id="prevMonth">涓婃湀: $0.00</div>
+                    <div class="stat-sub" id="prevMonth">上月: $0.00</div>
                 </div>
             </div>
 
-            <div class="chart-title" style="margin-top:28px;">姣忔棩鐕熸キ椤嶈秼鍔?/div>
+            <div class="chart-title" style="margin-top:28px;">每日營業額趋势</div>
             <div id="dailyChart" style="overflow-x:auto;"></div>
 
-            <div class="chart-title" style="margin-top:28px;">鏈堝害鏁告嵁琛?/div>
+            <div class="chart-title" style="margin-top:28px;">月度數据表</div>
             <div class="table-wrapper">
                 <table id="monthlyTable">
                     <thead>
-                        <tr><th>鏃ユ湡</th><th>鐕熸キ椤?/th><th>瑷傚柈鏁?/th><th>鑿滃紡鏁?/th><th>骞冲潎瀹㈠柈鍍?/th></tr>
+                        <tr><th>日期</th><th>營業額</th><th>訂單數</th><th>菜式數</th><th>平均客單價</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -216,7 +216,7 @@ function showToast(msg, type = 'success') {
 
 function loadDailyReport() {
     const date = document.getElementById('datePicker').value;
-    if (!date) { showToast('璜嬮伕鎿囨棩鏈?, 'warning'); return; }
+    if (!date) { showToast('請選擇日期', 'warning'); return; }
 
     document.getElementById('dailyReport').style.display = 'block';
     document.getElementById('monthlyReport').style.display = 'none';
@@ -253,12 +253,12 @@ function loadDailyReport() {
             html += '</div>';
             document.getElementById('hourlyChart').innerHTML = html;
         })
-        .catch(err => { document.getElementById('dailyLoading').style.display = 'none'; showToast('鍔犺級澶辨晽: ' + err, 'error'); });
+        .catch(err => { document.getElementById('dailyLoading').style.display = 'none'; showToast('加載失敗: ' + err, 'error'); });
 }
 
 function loadMonthlyReport() {
     const date = document.getElementById('datePicker').value;
-    if (!date) { showToast('璜嬮伕鎿囨棩鏈?, 'warning'); return; }
+    if (!date) { showToast('請選擇日期', 'warning'); return; }
     const [year, month] = date.split('-').slice(0,2);
 
     document.getElementById('dailyReport').style.display = 'none';
@@ -274,14 +274,14 @@ function loadMonthlyReport() {
             if (data.error) { showToast(data.error, 'error'); return; }
 
             document.getElementById('monthlyAmount').textContent = formatMoney(data.total_amount);
-            document.getElementById('monthlyPeriod').textContent = `${data.year}骞?{data.month}鏈坄;
+            document.getElementById('monthlyPeriod').textContent = `${data.year}年${data.month}月`;
             document.getElementById('monthlyOrders').textContent = data.total_orders;
             document.getElementById('monthlyDishes').textContent = data.total_dishes;
 
             const growthEl = document.getElementById('growthRate');
             growthEl.textContent = data.growth_rate + '%';
             growthEl.style.color = data.growth_rate > 0 ? 'var(--success)' : data.growth_rate < 0 ? 'var(--danger)' : 'var(--text)';
-            document.getElementById('prevMonth').textContent = `涓婃湀: ${formatMoney(data.prev_month.amount)} (${data.prev_month.orders}鍠?`;
+            document.getElementById('prevMonth').textContent = `上月: ${formatMoney(data.prev_month.amount)} (${data.prev_month.orders}單)`;
 
             const dailyStats = data.daily_stats || {};
             const tbody = document.querySelector('#monthlyTable tbody');
@@ -297,12 +297,12 @@ function loadMonthlyReport() {
             days.forEach(day => {
                 const amount = dailyStats[day].amount;
                 const pct = (amount / maxAmount) * 100;
-                html += `<div class="bar-col"><div class="bar" style="height:${pct}%"></div><div class="label">${day}鏃?/div><div class="amount">$${amount.toFixed(0)}</div></div>`;
+                html += `<div class="bar-col"><div class="bar" style="height:${pct}%"></div><div class="label">${day}日</div><div class="amount">$${amount.toFixed(0)}</div></div>`;
             });
             html += '</div>';
             document.getElementById('dailyChart').innerHTML = html;
         })
-        .catch(err => { document.getElementById('monthlyLoading').style.display = 'none'; showToast('鍔犺級澶辨晽', 'error'); });
+        .catch(err => { document.getElementById('monthlyLoading').style.display = 'none'; showToast('加載失敗', 'error'); });
 }
 
 function loadCurrentMonth() {

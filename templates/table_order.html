@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}榛為 - {{ table.table_number }}铏熸{% endblock %}
+{% extends "base.html" %}
+{% block title %}點餐 - {{ table.table_number }}號桌{% endblock %}
 {% block extra_head %}
 <style>
 body { padding-bottom: 90px; }
@@ -20,7 +20,7 @@ body { padding-bottom: 90px; }
 
 .table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* 鐣跺墠瑷傚柈闈㈡澘 */
+/* 當前訂單面板 */
 .current-order-panel {
     background: var(--card);
     border-radius: var(--radius);
@@ -61,7 +61,7 @@ body { padding-bottom: 90px; }
     margin-top: 12px;
 }
 
-/* 鍔犺彍閬僵婕歌畩 */
+/* 加菜遮罩漸變 */
 .add-dish-prompt {
     text-align: center;
     padding: 40px 20px;
@@ -70,7 +70,7 @@ body { padding-bottom: 90px; }
 
 .add-dish-prompt .icon { font-size: 56px; margin-bottom: 16px; }
 
-/* 涓嬪柈鎴愬姛鎻愮ず */
+/* 下單成功提示 */
 .redirect-toast {
     position: fixed;
     top: 50%;
@@ -87,7 +87,7 @@ body { padding-bottom: 90px; }
     animation: toastPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* 鑿滃紡鍒嗛妯欓 */
+/* 菜式分類標题 */
 .dish-section-title {
     margin: 24px 0 14px;
     font-size: 14px;
@@ -97,7 +97,7 @@ body { padding-bottom: 90px; }
     letter-spacing: 1px;
 }
 
-/* 鐒¤▊鍠彁绀?*/
+/* 無訂單提示 */
 .no-orders {
     text-align: center;
     color: var(--text-light);
@@ -105,7 +105,7 @@ body { padding-bottom: 90px; }
     font-size: 13px;
 }
 
-/* 鐣跺墠瑷傚柈涓殑鑿滃紡椤?*/
+/* 當前訂單中的菜式项 */
 .order-item-row {
     display: flex;
     justify-content: space-between;
@@ -136,57 +136,57 @@ body { padding-bottom: 90px; }
 {% block body %}
 <nav class="navbar">
     {% if from_home %}
-    <a href="/" class="logo">QR 鎺冪⒓榛為</a>
+    <a href="/" class="logo">QR 掃碼點餐</a>
     {% else %}
-    <span class="logo" style="cursor: default;">QR 鎺冪⒓榛為</span>
+    <span class="logo" style="cursor: default;">QR 掃碼點餐</span>
     {% endif %}
     <div style="font-size: 14px; font-weight: 600; opacity: 0.9;">
-        {{ table.table_number }} 铏熸
+        {{ table.table_number }} 號桌
     </div>
 </nav>
 
 <div class="table-header">
     <div class="table-info">
-        <h2>{{ table.table_number }} 铏熸</h2>
-        <div class="sub">鎺冪⒓榛為锛屾柟渚垮揩鎹?/div>
+        <h2>{{ table.table_number }} 號桌</h2>
+        <div class="sub">掃碼點餐，方便快捷</div>
     </div>
     <div class="table-actions">
         {% if from_home %}
-        <a href="/" class="btn btn-outline btn-sm">杩斿洖棣栭爜</a>
-        <button class="btn btn-primary" onclick="checkoutTable()">绲愯超</button>
+        <a href="/" class="btn btn-outline btn-sm">返回首頁</a>
         {% endif %}
-        {% if not from_home %}
-        <button class="btn btn-info btn-sm" onclick="showQRCode()">浜岀董纰?/button>
-        {% endif %}
+        <button class="btn btn-primary" onclick="checkoutTable()">結賬</button>
+        <button class="btn btn-info btn-sm" onclick="showQRCode()">二維碼</button>
+        <button class="btn btn-outline btn-sm" onclick="printCurrentOrder()">🖨 打印</button>
     </div>
 </div>
 
-<div class="redirect-toast" id="redirectToast" style="display:none;">涓嬪柈鎴愬姛锛?/div>
+<div class="redirect-toast" id="redirectToast" style="display:none;">下單成功！</div>
 
 <div class="order-page">
-    <!-- 鐣跺墠瑷傚柈闈㈡澘锛堟巸纰煎叆鍙ｄ笅鍠緦椤ず锛?-->
+    <!-- 當前訂單面板（掃碼入口下單後顯示） -->
     <div class="current-order-panel" id="currentOrderSection" style="display:none;">
-        <h3>鐣跺墠瑷傚柈</h3>
+        <h3>當前訂單</h3>
         <div id="currentOrderList"></div>
         <div class="order-summary">
-            鍚堣▓ <span id="currentOrderTotal">0.00</span>
+            合計 <span id="currentOrderTotal">0.00</span>
         </div>
         <div class="btn-row">
-            <button class="btn btn-info" onclick="showAddDish()">绻肩簩鍔犺彍</button>
-            <button class="btn btn-outline" onclick="printCurrentOrder()">馃枿 鎵撳嵃灏忕エ</button>
+            <button class="btn btn-info" onclick="showAddDish()">加菜</button>
+            <button class="btn btn-outline" onclick="printCurrentOrder()">🖨 打印小票</button>
+            <button class="btn btn-primary" onclick="checkoutTable()">結賬</button>
         </div>
     </div>
 
-    <!-- 鍘嗗彶瑷傚柈瑷橀寗 -->
+    <!-- 历史訂單記錄 -->
     <div class="orders-section" id="ordersSection" style="display:none;">
-        <h3>鏈瑷傚柈瑷橀寗</h3>
+        <h3>本桌訂單記錄</h3>
         <div id="ordersList"></div>
     </div>
 
-    <!-- 鑿滃紡鍒楄〃 -->
+    <!-- 菜式列表 -->
     <div id="dishListContainer" style="display:none;">
         <div class="category-nav" id="categoryNav">
-            <a href="#all" class="active" data-cat="all">鍏ㄩ儴</a>
+            <a href="#all" class="active" data-cat="all">全部</a>
             {% for cat in categories.keys() %}
             <a href="#cat-{{ cat.id }}" data-cat="{{ cat.id }}">{{ cat.name }}</a>
             {% endfor %}
@@ -202,15 +202,15 @@ body { padding-bottom: 90px; }
                         {% if dish.image_path %}
                         <img src="{{ dish.image_path }}" alt="{{ dish.name }}" class="dish-img">
                         {% else %}
-                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">馃嵔</div>
+                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">🍽</div>
                         {% endif %}
                         <div class="dish-info">
                             <div class="dish-name">{{ dish.name }}</div>
-                            <div class="dish-desc">{{ dish.description or '缇庡懗鍙彛锛屽€煎緱鍝佸殣' }}</div>
+                            <div class="dish-desc">{{ dish.description or '美味可口，值得品嚐' }}</div>
                             <div class="dish-bottom">
                                 <div class="dish-price">{{ "%.2f"|format(dish.price) }}</div>
                                 <div class="quantity-ctrl">
-                                    <button onclick="changeQty({{ dish.id }}, -1)">鈭?/button>
+                                    <button onclick="changeQty({{ dish.id }}, -1)">−</button>
                                     <span class="qty-num" id="qty-{{ dish.id }}">0</span>
                                     <button onclick="changeQty({{ dish.id }}, 1)">+</button>
                                 </div>
@@ -222,64 +222,64 @@ body { padding-bottom: 90px; }
             </div>
             {% else %}
             <div style="text-align:center;padding:60px 20px;color:var(--text-light);">
-                <div style="font-size:56px;margin-bottom:16px;">馃嵔</div>
-                鏆劇鑿滃紡锛岃珛鑱公鍟嗗娣诲姞
+                <div style="font-size:56px;margin-bottom:16px;">🍽</div>
+                暫無菜式，請聯繫商家添加
             </div>
             {% endfor %}
         </div>
     </div>
 
-    <!-- 璩肩墿杌婂簳鏍?-->
+    <!-- 購物車底栏 -->
     <div class="cart-bar" id="cartBar" style="display:none;">
         <div class="cart-info">
             <div class="cart-badge" id="cartCount">0</div>
             <div>
-                <div style="font-size:12px;color:var(--text-light);">宸查伕 <span id="cartItemCount">0</span> 浠?/div>
+                <div style="font-size:12px;color:var(--text-light);">已選 <span id="cartItemCount">0</span> 件</div>
                 <div class="cart-total" id="cartTotal">0.00</div>
             </div>
         </div>
-        <button class="btn btn-primary btn-lg" onclick="submitOrder()">涓嬪柈</button>
+        <button class="btn btn-primary btn-lg" onclick="submitOrder()">提交加菜</button>
     </div>
 
-    <!-- 鍌欒ɑ褰堢獥 -->
+    <!-- 備註彈窗 -->
     <div class="modal-overlay" id="remarkModal">
         <div class="modal">
-            <div class="modal-title">娣诲姞鍌欒ɑ锛堝彲閬革級</div>
+            <div class="modal-title">添加備註（可選）</div>
             <div class="form-group">
-                <textarea class="form-control" id="remarkInput" placeholder="濡傦細灏戣荆銆佷笉瑕侀鑿?.."></textarea>
+                <textarea class="form-control" id="remarkInput" placeholder="如：少辣、不要香菜..."></textarea>
             </div>
             <div class="modal-actions">
-                <button class="btn btn-outline" onclick="closeRemark()">璺抽亷</button>
-                <button class="btn btn-primary" onclick="confirmOrder()">纰鸿獚涓嬪柈</button>
+                <button class="btn btn-outline" onclick="closeRemark()">跳過</button>
+                <button class="btn btn-primary" onclick="confirmOrder()">確認下單</button>
             </div>
         </div>
     </div>
 
-    <!-- 绲愯超纰鸿獚褰堢獥 -->
+    <!-- 結賬確認彈窗 -->
     <div class="modal-overlay" id="checkoutConfirmModal">
         <div class="modal">
-            <div class="modal-title">纰鸿獚绲愯超</div>
+            <div class="modal-title">確認結賬</div>
             <div class="modal-body">
-                <p>纰哄畾瑕佺偤 <strong>{{ table.table_number }} 铏熸</strong> 绲愯超鍡庯紵</p>
-                <p style="font-size:13px;color:var(--text-light);">绲愯超寰岃┎妗屾墍鏈夋湭瀹屾垚瑷傚柈灏囨瑷樼偤宸插畬鎴愩€?/p>
+                <p>確定要為 <strong>{{ table.table_number }} 號桌</strong> 結賬嗎？</p>
+                <p style="font-size:13px;color:var(--text-light);">結賬後該桌所有未完成訂單將標記為已完成。</p>
             </div>
             <div class="modal-actions">
-                <button class="btn btn-outline" onclick="closeCheckoutConfirm()">鍙栨秷</button>
-                <button class="btn btn-outline" onclick="printCurrentOrder()">馃枿 鎵撳嵃灏忕エ</button>
-                <button class="btn btn-success" onclick="confirmCheckout()">纰鸿獚绲愯超</button>
+                <button class="btn btn-outline" onclick="closeCheckoutConfirm()">取消</button>
+                <button class="btn btn-outline" onclick="printCurrentOrder()">🖨 打印小票</button>
+                <button class="btn btn-success" onclick="confirmCheckout()">確認結賬</button>
             </div>
         </div>
     </div>
 
-    <!-- 浜岀董纰煎綀绐?-->
+    <!-- 二維碼彈窗 -->
     <div class="modal-overlay" id="qrModal">
         <div class="modal" style="text-align:center;">
-            <h3 style="margin-bottom:16px;">{{ table.table_number }} 铏熸浜岀董纰?/h3>
-            <img id="qrImage" src="" alt="鍙拌櫉浜岀董纰? style="max-width:100%;border:1px solid var(--border-light);border-radius:8px;margin:12px 0;">
+            <h3 style="margin-bottom:16px;">{{ table.table_number }} 號桌二維碼</h3>
+            <img id="qrImage" src="" alt="台號二維碼" style="max-width:100%;border:1px solid var(--border-light);border-radius:8px;margin:12px 0;">
             <p style="font-size:13px;color:var(--text-light);word-break:break-all;" id="qrUrl"></p>
             <div class="modal-actions" style="justify-content:center;">
-                <button class="btn btn-success" onclick="downloadQR()">涓嬭級浜岀董纰?/button>
-                <button class="btn btn-outline" onclick="closeQR()">闂滈枆</button>
+                <button class="btn btn-success" onclick="downloadQR()">下載二維碼</button>
+                <button class="btn btn-outline" onclick="closeQR()">關閉</button>
             </div>
         </div>
     </div>
@@ -292,15 +292,15 @@ const tableNumber = "{{ table.table_number }}";
 const fromHome = {{ 'true' if from_home else 'false' }};
 
 const STATUS_TEXT = {
-    'pending': '寰呰檿鐞?, 'confirmed': '宸茬⒑瑾?,
-    'completed': '宸插畬鎴?, 'cancelled': '宸插彇娑?
+    'pending': '待處理', 'confirmed': '已確認',
+    'completed': '已完成', 'cancelled': '已取消'
 };
 
 let currentOrderItems = [];
 let currentOrderTotal = 0;
 let currentOrderId = null;
 
-// 闋侀潰鍔犺級锛氱嵅鍙栬┎妗屽凡鏈夎▊鍠?
+// 頁面加載：獲取該桌已有訂單
 fetch('/api/order/' + tableNumber + '/orders')
     .then(r => r.json())
     .then(orders => {
@@ -308,7 +308,7 @@ fetch('/api/order/' + tableNumber + '/orders')
             document.getElementById('ordersSection').style.display = 'block';
             const listEl = document.getElementById('ordersList');
             orders.forEach(o => {
-                const itemsText = o.items.map(i => i.dish_name + '脳' + i.quantity).join('銆?);
+                const itemsText = o.items.map(i => i.dish_name + '×' + i.quantity).join('、');
                 listEl.innerHTML += `
                     <div class="order-history-item ${o.status}">
                         <div class="oh-header">
@@ -316,7 +316,7 @@ fetch('/api/order/' + tableNumber + '/orders')
                             <span class="oh-time">${o.created_at}</span>
                         </div>
                         <div class="oh-items">${itemsText}</div>
-                        ${o.remark ? '<div style="color:#999;font-size:11px;">鍌欒ɑ: ' + o.remark + '</div>' : ''}
+                        ${o.remark ? '<div style="color:#999;font-size:11px;">備註: ' + o.remark + '</div>' : ''}
                         <div class="oh-total">$${o.total_price.toFixed(2)}</div>
                     </div>
                 `;
@@ -342,7 +342,7 @@ fetch('/api/order/' + tableNumber + '/orders')
         document.getElementById('dishListContainer').style.display = 'block';
     });
 
-// 鍒嗛瀵艰埅
+// 分類导航
 document.querySelectorAll('#categoryNav a').forEach(a => {
     a.addEventListener('click', function(e) {
         e.preventDefault();
@@ -383,7 +383,7 @@ function updateCart() {
 }
 
 function submitOrder() {
-    if (Object.keys(cart).length === 0) { showToast('璜嬪厛閬告搰鑿滃紡', 'warning'); return; }
+    if (Object.keys(cart).length === 0) { showToast('請先選擇菜式', 'warning'); return; }
     document.getElementById('remarkModal').classList.add('active');
 }
 
@@ -415,7 +415,6 @@ function confirmOrder() {
                 document.getElementById('redirectToast').style.display = 'block';
                 setTimeout(() => { window.location.href = '/'; }, 1500);
             } else {
-                // QR 鎺冪⒓妯″紡锛氭瘡娆′笅鍠壍寤虹崹绔嬫柊瑷傚柈锛岀鐞嗛浕鑵﹁嚜鍕曟墦鍗?
                 currentOrderId = data.order_id;
                 const newItems = [];
                 if (data.order && data.order.items && data.order.items.length > 0) {
@@ -424,41 +423,45 @@ function confirmOrder() {
                     items.forEach(it => {
                         const snap = cartSnapshot[it.dish_id];
                         newItems.push({
-                            dish_name: snap ? snap.name : ('鑿滃紡#' + it.dish_id),
+                            dish_name: snap ? snap.name : ('菜式#' + it.dish_id),
                             quantity: it.quantity,
                             price: snap ? snap.price : 0
                         });
                     });
                 }
                 const merged = {};
-                newItems.forEach(item => {
-                    const key = item.dish_name || '鏈煡';
-                    merged[key] = { dish_name: key, quantity: item.quantity || 0, price: item.price || 0 };
+                [...currentOrderItems, ...newItems].forEach(item => {
+                    const key = item.dish_name || '未知';
+                    if (merged[key]) {
+                        merged[key].quantity += (item.quantity || 0);
+                    } else {
+                        merged[key] = { dish_name: key, quantity: item.quantity || 0, price: item.price || 0 };
+                    }
                 });
                 currentOrderItems = Object.values(merged);
                 currentOrderTotal = currentOrderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
                 showCurrentOrder();
-                showToast('涓嬪柈鎴愬姛');
+                showToast('加菜成功');
                 setTimeout(() => printCurrentOrder(), 600);
             }
         } else {
-            showToast(data.error || '涓嬪柈澶辨晽', 'error');
+            showToast(data.error || '下單失敗', 'error');
         }
     })
-    .catch(() => showToast('缍茬怠閷', 'error'));
+    .catch(() => showToast('網絡錯誤', 'error'));
 }
 
 function showCurrentOrder() {
     const section = document.getElementById('currentOrderSection');
     const listEl = document.getElementById('currentOrderList');
     if (!currentOrderItems || currentOrderItems.length === 0) {
-        listEl.innerHTML = '<div class="no-orders">鏆劇鑿滃紡</div>';
+        listEl.innerHTML = '<div class="no-orders">暫無菜式</div>';
     } else {
         listEl.innerHTML = currentOrderItems.map(item => `
             <div class="order-item-row">
                 <div class="item-info">
-                    <span class="item-name">${item.dish_name || '鏈煡鑿滃紡'}</span>
-                    <span class="item-qty">脳${item.quantity || 0}</span>
+                    <span class="item-name">${item.dish_name || '未知菜式'}</span>
+                    <span class="item-qty">×${item.quantity || 0}</span>
                 </div>
                 <span class="item-price">$${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</span>
             </div>
@@ -494,30 +497,30 @@ function confirmCheckout() {
         .then(r => r.json())
         .then(tables => {
             const table = tables.find(t => t.table_number === tableNumber);
-            if (!table) { showToast('鏈壘鍒板彴铏熶俊鎭?, 'error'); return; }
+            if (!table) { showToast('未找到台號信息', 'error'); return; }
             return fetch(`/api/table/${table.id}/checkout`, {method: 'POST'});
         })
         .then(r => r.json())
         .then(data => {
             if (data && data.success) {
-                // 娓呯┖璩肩墿杌?
+                // 清空購物車
                 cart = {};
                 document.querySelectorAll('.qty-num').forEach(el => el.textContent = '0');
                 updateCart();
-                // 閲嶇疆瑷傚柈鐙€鎱嬭畩閲?
+                // 重置訂單狀態變量
                 currentOrderItems = [];
                 currentOrderTotal = 0;
                 currentOrderId = null;
-                // 闅辫棌鐣跺墠瑷傚柈闈㈡澘
+                // 隱藏當前訂單面板
                 document.getElementById('currentOrderSection').style.display = 'none';
                 document.getElementById('currentOrderList').innerHTML = '';
-                // 闅辫棌姝峰彶瑷傚柈
+                // 隱藏歷史訂單
                 document.getElementById('ordersSection').style.display = 'none';
                 document.getElementById('ordersList').innerHTML = '';
-                // 椤ず鑿滃紡鍒楄〃锛岄噸缃偤绌虹櫧榛為鐙€鎱?
+                // 顯示菜式列表，重置為空白點餐狀態
                 document.getElementById('dishListContainer').style.display = 'block';
-                showToast('绲愯超鎴愬姛锛屾鍦ㄦ墦鍗?..');
-                // 鑷嫊鎵撳嵃灏忕エ锛堣鐢ㄩ浕鑵︽湰姗熸墦鍗版锛?
+                showToast('結賬成功，正在打印...');
+                // 自動打印小票（調用電腦本機打印機）
                 if (checkoutOrderId) {
                     setTimeout(() => {
                         window.open('/print/order/' + checkoutOrderId, '_blank', 'width=400,height=600');
@@ -528,7 +531,7 @@ function confirmCheckout() {
                 }
             }
         })
-        .catch(err => showToast('绲愯超澶辨晽: ' + err, 'error'));
+        .catch(err => showToast('結賬失敗: ' + err, 'error'));
 }
 
 let currentQRImage = '', currentQRUrl = '';
@@ -538,14 +541,14 @@ function showQRCode() {
         .then(r => r.json())
         .then(tables => {
             const table = tables.find(t => t.table_number === tableNumber);
-            if (!table) { showToast('鏈壘鍒板彴铏熶俊鎭?, 'error'); return; }
+            if (!table) { showToast('未找到台號信息', 'error'); return; }
             currentQRImage = table.qr_code;
             currentQRUrl = table.order_url;
             document.getElementById('qrImage').src = currentQRImage;
             document.getElementById('qrUrl').textContent = currentQRUrl;
             document.getElementById('qrModal').classList.add('active');
         })
-        .catch(err => showToast('鐛插彇浜岀董纰煎け鏁? ' + err, 'error'));
+        .catch(err => showToast('獲取二維碼失敗: ' + err, 'error'));
 }
 
 function closeQR() {
@@ -556,7 +559,7 @@ function closeQR() {
 function downloadQR() {
     if (!currentQRImage) return;
     const link = document.createElement('a');
-    link.download = `鍙拌櫉${tableNumber}浜岀董纰?png`;
+    link.download = `台號${tableNumber}二維碼.png`;
     link.href = currentQRImage;
     document.body.appendChild(link);
     link.click();
@@ -565,7 +568,7 @@ function downloadQR() {
 
 function printCurrentOrder() {
     if (!currentOrderId) {
-        showToast('鏆劇瑷傚柈鍙緵鍒楀嵃', 'warning');
+        showToast('暫無訂單可供列印', 'warning');
         return;
     }
     window.open('/print/order/' + currentOrderId, '_blank', 'width=400,height=600');
