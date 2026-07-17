@@ -20,24 +20,24 @@
         }
 
         .receipt {
-            width: 80mm;
+            width: 90mm;
             background: #fff;
             padding: 6mm 4mm 5mm;
-            font-size: 16px;
+            font-size: 18px;
             line-height: 1.5;
             color: #000;
             text-align: center;
         }
 
         .receipt .store-name {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: bold;
-            letter-spacing: 3px;
+            letter-spacing: 4px;
             margin-bottom: 6px;
         }
 
         .receipt .info-row {
-            font-size: 15px;
+            font-size: 18px;
             margin-bottom: 3px;
             text-align: center;
         }
@@ -61,8 +61,8 @@
             justify-content: space-between;
             align-items: baseline;
             text-align: left;
-            padding: 3px 0;
-            font-size: 15px;
+            padding: 4px 0;
+            font-size: 18px;
         }
 
         .receipt .item-name {
@@ -78,41 +78,41 @@
             white-space: nowrap;
             margin-left: 6px;
             color: #333;
-            font-size: 14px;
+            font-size: 17px;
         }
 
         .receipt .item-subtotal {
             white-space: nowrap;
             margin-left: 6px;
             text-align: right;
-            min-width: 50px;
+            min-width: 60px;
             font-weight: bold;
-            font-size: 15px;
+            font-size: 18px;
         }
 
         .receipt .total-row {
             display: flex;
             justify-content: space-between;
-            font-size: 18px;
+            font-size: 22px;
             font-weight: bold;
             padding: 4px 0;
             margin-top: 2px;
         }
 
         .receipt .total-amount {
-            font-size: 24px;
+            font-size: 32px;
             letter-spacing: 1px;
         }
 
         .receipt .footer-text {
             margin-top: 8px;
-            font-size: 16px;
+            font-size: 20px;
             font-weight: bold;
-            letter-spacing: 3px;
+            letter-spacing: 4px;
         }
 
         .receipt .footer-sub {
-            font-size: 12px;
+            font-size: 14px;
             color: #444;
             margin-top: 4px;
         }
@@ -123,17 +123,17 @@
                 background: #fff;
                 padding: 0;
                 margin: 0;
-                width: 80mm;
+                width: 90mm;
             }
 
             .receipt {
                 box-shadow: none;
                 padding: 4mm 3mm 3mm;
-                width: 80mm;
+                width: 90mm;
             }
 
             @page {
-                size: 80mm auto;
+                size: 90mm auto;
                 margin: 0;
             }
         }
@@ -174,7 +174,7 @@
             <span class="total-amount">${{ "%.2f"|format(order.total_price) }}</span>
         </div>
 
-        <div class="total-row" style="font-weight:normal;font-size:14px;margin-top:0;">
+        <div class="total-row" style="font-weight:normal;font-size:16px;margin-top:0;">
             <span>共 {{ items|length }} 項</span>
             <span></span>
         </div>
