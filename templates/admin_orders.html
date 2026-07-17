@@ -4,7 +4,7 @@
 <div class="card">
     <div class="card-header">
         <div class="card-title">📦 訂單管理</div>
-        <div class="filter-bar" style="margin-bottom:0;">
+        <div class="filter-bar" style="margin-bottom:0;display:flex;align-items:center;gap:10px;">
             <select class="form-control" id="statusFilter" style="width:140px;" onchange="loadOrders()">
                 <option value="">全部狀態</option>
                 <option value="pending">待處理</option>
@@ -12,6 +12,9 @@
                 <option value="completed">已完成</option>
                 <option value="cancelled">已取消</option>
             </select>
+            <button class="btn btn-sm" id="autoPrintBtn" onclick="toggleAutoPrint()" style="white-space:nowrap;">
+                🔔 自動出票：關
+            </button>
         </div>
     </div>
 
@@ -143,5 +146,68 @@ function updateStatus(orderId, status) {
 }
 
 loadOrders();
+
+// ===== 自動出票（綁定管理電腦）=====
+let autoPrintEnabled = false;
+let seenOrderIds = new Set();
+let autoPrintTimer = null;
+
+// 初始化：載入現有待處理訂單 ID，避免重複打印
+function initSeenOrders() {
+    fetch('/api/admin/orders?status=pending')
+        .then(r => r.json())
+        .then(data => {
+            data.forEach(o => seenOrderIds.add(o.id));
+        });
+}
+
+function toggleAutoPrint() {
+    autoPrintEnabled = !autoPrintEnabled;
+    const btn = document.getElementById('autoPrintBtn');
+    if (autoPrintEnabled) {
+        btn.textContent = '🔔 自動出票：開';
+        btn.className = 'btn btn-sm btn-success';
+        initSeenOrders();
+        autoPrintTimer = setInterval(pollNewOrders, 3000);
+        showToast('已開啟自動出票，新訂單將自動打印');
+    } else {
+        btn.textContent = '🔔 自動出票：關';
+        btn.className = 'btn btn-sm';
+        if (autoPrintTimer) clearInterval(autoPrintTimer);
+        showToast('已關閉自動出票');
+    }
+}
+
+function pollNewOrders() {
+    if (!autoPrintEnabled) return;
+    fetch('/api/admin/orders?status=pending')
+        .then(r => r.json())
+        .then(data => {
+            data.forEach(o => {
+                if (!seenOrderIds.has(o.id)) {
+                    seenOrderIds.add(o.id);
+                    // 自動打印
+                    const w = window.open('/print/order/' + o.id, '_blank', 'width=400,height=600');
+                    if (!w) {
+                        // 彈窗被封鎖，用 iframe 兜底
+                        const iframe = document.createElement('iframe');
+                        iframe.src = '/print/order/' + o.id;
+                        iframe.style.display = 'none';
+                        document.body.appendChild(iframe);
+                        setTimeout(() => document.body.removeChild(iframe), 5000);
+                    }
+                }
+            });
+        });
+}
+
+// 手動打印時也標記為已見過
+const origPrintOrder = printOrder;
+printOrder = function(orderId) {
+    seenOrderIds.add(orderId);
+    origPrintOrder(orderId);
+};
+
+initSeenOrders();
 </script>
 {% endblock %}
