@@ -203,7 +203,7 @@ body { padding-bottom: 90px; }
                         {% if dish.image_path %}
                         <img src="{{ dish.image_path }}" alt="{{ dish.name }}" class="dish-img">
                         {% else %}
-                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">🍽</div>
+                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">▪</div>
                         {% endif %}
                         <div class="dish-info">
                             <div class="dish-name">{{ dish.name }}</div>
@@ -223,7 +223,7 @@ body { padding-bottom: 90px; }
             </div>
             {% else %}
             <div style="text-align:center;padding:60px 20px;color:var(--text-light);">
-                <div style="font-size:56px;margin-bottom:16px;">🍽</div>
+                <div style="font-size:56px;margin-bottom:16px;">▪</div>
                 暫無菜式，請聯繫商家添加
             </div>
             {% endfor %}
@@ -236,7 +236,7 @@ body { padding-bottom: 90px; }
                         {% if combo.image_path %}
                         <img src="{{ combo.image_path }}" alt="{{ combo.name }}" class="dish-img">
                         {% else %}
-                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">🎁</div>
+                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">▪</div>
                         {% endif %}
                         <div class="dish-info">
                             <div class="dish-name">{{ combo.name }}</div>
@@ -246,9 +246,7 @@ body { padding-bottom: 90px; }
                             <div class="dish-bottom">
                                 <div class="dish-price">{{ "%.2f"|format(combo.price) }}</div>
                                 <div class="quantity-ctrl">
-                                    <button onclick="changeComboQty({{ combo.id }}, -1)">−</button>
-                                    <span class="qty-num" id="qty-combo-{{ combo.id }}">0</span>
-                                    <button onclick="changeComboQty({{ combo.id }}, 1)">+</button>
+                                    <button onclick="openComboModal({{ combo.id }})">選擇</button>
                                 </div>
                             </div>
                         </div>
@@ -270,6 +268,18 @@ body { padding-bottom: 90px; }
             </div>
         </div>
         <button class="btn btn-primary btn-lg" onclick="submitOrder()">提交加菜</button>
+    </div>
+
+    <!-- 套餐選擇彈窗 -->
+    <div class="modal-overlay" id="comboSelectModal">
+        <div class="modal" style="max-width:500px;">
+            <div class="modal-title" id="comboSelectTitle">選擇套餐內容</div>
+            <div class="modal-body" id="comboSelectBody"></div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeComboModal()">取消</button>
+                <button class="btn btn-primary" onclick="addComboToCart()">加入購物車</button>
+            </div>
+        </div>
     </div>
 
     <!-- 備註彈窗 -->
@@ -330,6 +340,13 @@ const STATUS_TEXT = {
 let currentOrderItems = [];
 let currentOrderTotal = 0;
 let currentOrderId = null;
+let allCombos = [];
+let currentComboId = null;
+
+// 預載套餐數據
+fetch('/api/admin/combos')
+    .then(r => r.json())
+    .then(data => { allCombos = data; });
 
 // 頁面加載：獲取該桌已有訂單
 fetch('/api/order/' + tableNumber + '/orders')
@@ -399,17 +416,73 @@ function changeQty(dishId, delta) {
     updateCart();
 }
 
-function changeComboQty(comboId, delta) {
-    const key = 'combo_' + comboId;
-    if (!cart[key]) cart[key] = { name: '', price: 0, qty: 0, isCombo: true, comboId: comboId };
-    const card = document.querySelector(`[data-combo-id="${comboId}"]`);
-    const name = card.querySelector('.dish-name').textContent;
-    const price = parseFloat(card.querySelector('.dish-price').textContent);
-    cart[key].name = name;
-    cart[key].price = price;
-    cart[key].qty = Math.max(0, cart[key].qty + delta);
-    if (cart[key].qty === 0) delete cart[key];
-    document.getElementById(`qty-combo-${comboId}`).textContent = cart[key] ? cart[key].qty : 0;
+// ========== 套餐選擇彈窗 ==========
+
+function openComboModal(comboId) {
+    currentComboId = comboId;
+    const combo = allCombos.find(c => c.id === comboId);
+    if (!combo) { showToast('套餐數據未載入', 'warning'); return; }
+
+    document.getElementById('comboSelectTitle').textContent = combo.name;
+    const mainItems = combo.dishes.filter(d => d.dish_type === 'main');
+    const sideItems = combo.dishes.filter(d => d.dish_type === 'side');
+
+    let html = '';
+    html += '<div style="margin-bottom:16px;"><strong style="color:var(--primary);">主食（選1項）</strong></div>';
+    mainItems.forEach((d, idx) => {
+        html += `<label style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light);cursor:pointer;">
+            <input type="radio" name="combo-main" value="${d.dish_id}" data-name="${d.dish_name}" ${idx === 0 ? 'checked' : ''}>
+            <span style="flex:1;margin-left:8px;">${d.dish_name}</span>
+            <span style="color:var(--text-light);font-size:12px;">主食</span>
+        </label>`;
+    });
+
+    html += '<div style="margin:16px 0 8px;"><strong style="color:var(--primary);">飲品/湯（選1項）</strong></div>';
+    if (sideItems.length === 0) {
+        html += '<span style="color:var(--text-light);">此套餐暫無飲品/湯選項</span>';
+    } else {
+        sideItems.forEach((d, idx) => {
+            html += `<label style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light);cursor:pointer;">
+                <input type="radio" name="combo-side" value="${d.dish_id}" data-name="${d.dish_name}" ${idx === 0 ? 'checked' : ''}>
+                <span style="flex:1;margin-left:8px;">${d.dish_name}</span>
+                <span style="color:var(--text-light);font-size:12px;">飲品/湯</span>
+            </label>`;
+        });
+    }
+
+    document.getElementById('comboSelectBody').innerHTML = html;
+    document.getElementById('comboSelectModal').classList.add('active');
+}
+
+function closeComboModal() {
+    document.getElementById('comboSelectModal').classList.remove('active');
+    currentComboId = null;
+}
+
+function addComboToCart() {
+    const mainRadio = document.querySelector('input[name="combo-main"]:checked');
+    const sideRadio = document.querySelector('input[name="combo-side"]:checked');
+    if (!mainRadio || !sideRadio) { showToast('請選擇主食和飲品/湯各一項', 'warning'); return; }
+
+    const combo = allCombos.find(c => c.id === currentComboId);
+    const selections = [
+        { dish_id: parseInt(mainRadio.value), dish_name: mainRadio.dataset.name, dish_type: 'main' },
+        { dish_id: parseInt(sideRadio.value), dish_name: sideRadio.dataset.name, dish_type: 'side' }
+    ];
+
+    const cartKey = `combo_${currentComboId}`;
+    if (!cart[cartKey]) {
+        cart[cartKey] = {
+            type: 'combo',
+            id: currentComboId,
+            name: combo.name,
+            price: combo.price,
+            selections: selections,
+            qty: 0
+        };
+    }
+    cart[cartKey].qty++;
+    closeComboModal();
     updateCart();
 }
 
@@ -437,8 +510,8 @@ function closeRemark() { document.getElementById('remarkModal').classList.remove
 function confirmOrder() {
     const items = Object.keys(cart).map(key => {
         const c = cart[key];
-        if (c.isCombo) {
-            return { combo_id: c.comboId, quantity: c.qty };
+        if (c.type === 'combo') {
+            return { combo_id: c.id, quantity: c.qty, selections: c.selections };
         } else {
             return { dish_id: parseInt(key), quantity: c.qty };
         }
@@ -477,11 +550,15 @@ function confirmOrder() {
                         } else {
                             snap = cartSnapshot[it.dish_id];
                         }
-                        newItems.push({
+                        const newItem = {
                             dish_name: snap ? snap.name : (it.combo_id ? ('套餐#' + it.combo_id) : ('菜式#' + it.dish_id)),
                             quantity: it.quantity,
                             price: snap ? snap.price : 0
-                        });
+                        };
+                        if (it.combo_id && snap && snap.selections) {
+                            newItem.combo_selections = snap.selections;
+                        }
+                        newItems.push(newItem);
                     });
                 }
                 const merged = {};
@@ -512,7 +589,13 @@ function showCurrentOrder() {
     if (!currentOrderItems || currentOrderItems.length === 0) {
         listEl.innerHTML = '<div class="no-orders">暫無菜式</div>';
     } else {
-        listEl.innerHTML = currentOrderItems.map(item => `
+        listEl.innerHTML = currentOrderItems.map(item => {
+            let selectionsHtml = '';
+            if (item.combo_selections && item.combo_selections.length) {
+                selectionsHtml = '<div style="font-size:11px;color:var(--text-light);padding-left:12px;">' +
+                    item.combo_selections.map(s => '- ' + s.dish_name).join('<br>') + '</div>';
+            }
+            return `
             <div class="order-item-row">
                 <div class="item-info">
                     <span class="item-name">${item.dish_name || '未知菜式'}</span>
@@ -520,7 +603,8 @@ function showCurrentOrder() {
                 </div>
                 <span class="item-price">$${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</span>
             </div>
-        `).join('');
+            ${selectionsHtml}
+        `}).join('');
     }
     document.getElementById('currentOrderTotal').textContent = (currentOrderTotal || 0).toFixed(2);
     section.style.display = 'block';

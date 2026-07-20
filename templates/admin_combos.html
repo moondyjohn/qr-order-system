@@ -3,7 +3,7 @@
 {% block admin_content %}
 <div class="card">
     <div class="card-header">
-        <div class="card-title">🎁 套餐管理</div>
+        <div class="card-title">套餐管理</div>
         <button class="btn btn-primary" onclick="openComboModal()">+ 添加套餐</button>
     </div>
 
@@ -48,8 +48,8 @@
                 <textarea class="form-control" id="comboDesc" placeholder="簡要描述套餐..."></textarea>
             </div>
             <div class="form-group">
-                <label>選擇菜式（至少選 2 個）</label>
-                <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-light);border-radius:var(--radius);padding:12px;" id="dishCheckboxList">
+                <label>選擇菜式（主食類和飲品/湯品類各至少選 1 項）</label>
+                <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border-light);border-radius:var(--radius);padding:12px;" id="dishCheckboxList">
                     <span style="color:var(--text-light);">載入菜式列表...</span>
                 </div>
             </div>
@@ -92,24 +92,46 @@ function loadDishList() {
         });
 }
 
-function renderDishCheckboxes(selectedIds) {
+function renderDishCheckboxes(selectedItems) {
     const container = document.getElementById('dishCheckboxList');
     if (allDishes.length === 0) {
         container.innerHTML = '<span style="color:var(--text-light);">暫無菜式，請先添加菜式</span>';
         return;
     }
-    container.innerHTML = allDishes.map(d => `
-        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border-light);">
-            <input type="checkbox" class="dish-check" value="${d.id}" ${selectedIds.includes(d.id) ? 'checked' : ''}>
-            <span><strong>${d.name}</strong> <span style="color:var(--text-light);font-size:12px;">(${d.category_name})</span></span>
-            <span style="margin-left:auto;color:var(--danger);font-weight:600;">$${d.price.toFixed(2)}</span>
-        </label>
-    `).join('');
+    // selectedItems: [{dish_id, dish_type}, ...]
+    const selectedMap = {};
+    selectedItems.forEach(it => { selectedMap[it.dish_id] = it.dish_type || 'main'; });
+    container.innerHTML = allDishes.map(d => {
+        const isChecked = selectedMap.hasOwnProperty(d.id);
+        const curType = selectedMap[d.id] || 'main';
+        return `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);">
+            <input type="checkbox" class="dish-check" value="${d.id}" ${isChecked ? 'checked' : ''}
+                   onchange="toggleDishType(this)">
+            <span style="flex:1;"><strong>${d.name}</strong> <span style="color:var(--text-light);font-size:12px;">(${d.category_name})</span></span>
+            <span style="color:var(--danger);font-weight:600;margin-right:8px;">$${d.price.toFixed(2)}</span>
+            <select class="dish-type-select" data-dish-id="${d.id}" style="display:${isChecked ? 'inline-block' : 'none'};padding:2px 6px;font-size:12px;border-radius:4px;border:1px solid var(--border-light);">
+                <option value="main" ${curType === 'main' ? 'selected' : ''}>主食</option>
+                <option value="side" ${curType === 'side' ? 'selected' : ''}>飲品/湯</option>
+            </select>
+        </div>
+    `}).join('');
 }
 
-function getSelectedDishIds() {
+function toggleDishType(cb) {
+    const dishId = cb.value;
+    const sel = document.querySelector(`.dish-type-select[data-dish-id="${dishId}"]`);
+    if (sel) sel.style.display = cb.checked ? 'inline-block' : 'none';
+}
+
+function getSelectedItems() {
     const checks = document.querySelectorAll('.dish-check:checked');
-    return Array.from(checks).map(c => parseInt(c.value));
+    return Array.from(checks).map(c => {
+        const dishId = parseInt(c.value);
+        const sel = document.querySelector(`.dish-type-select[data-dish-id="${dishId}"]`);
+        const dishType = sel ? sel.value : 'main';
+        return { dish_id: dishId, dish_type: dishType };
+    });
 }
 
 function loadCombos() {
@@ -122,7 +144,10 @@ function loadCombos() {
                 return;
             }
             tbody.innerHTML = data.map(c => {
-                const dishNames = c.dishes.map(d => d.dish_name).join('、') || '—';
+                const dishNames = c.dishes.map(d => {
+                    const typeTag = d.dish_type === 'main' ? '主食' : '飲品/湯';
+                    return `${d.dish_name}[${typeTag}]`;
+                }).join('、') || '—';
                 return `
                 <tr>
                     <td>${c.id}</td>
@@ -132,7 +157,7 @@ function loadCombos() {
                             : '<span style="color:var(--text-light);">無圖</span>'}
                     </td>
                     <td><strong>${c.name}</strong></td>
-                    <td style="font-size:13px;">${dishNames}</td>
+                    <td style="font-size:12px;">${dishNames}</td>
                     <td style="color:var(--danger);font-weight:600;">$${c.price.toFixed(2)}</td>
                     <td>
                         <span class="badge ${c.is_available ? 'badge-completed' : 'badge-cancelled'}">
@@ -180,8 +205,8 @@ function editCombo(id) {
             // 載入菜式列表並勾選已選擇的
             fetch('/api/admin/dishes').then(r => r.json()).then(dishes => {
                 allDishes = dishes;
-                const selectedIds = c.dishes.map(d => d.dish_id);
-                renderDishCheckboxes(selectedIds);
+                const selectedItems = c.dishes.map(d => ({ dish_id: d.dish_id, dish_type: d.dish_type || 'main' }));
+                renderDishCheckboxes(selectedItems);
             });
             document.getElementById('comboModal').classList.add('active');
         });
@@ -194,15 +219,18 @@ function saveCombo() {
     const price = parseFloat(document.getElementById('comboPrice').value);
     if (isNaN(price) || price < 0) { showToast('請輸入有效價格', 'warning'); return; }
 
-    const dishIds = getSelectedDishIds();
-    if (dishIds.length < 2) { showToast('請至少選擇 2 個菜式', 'warning'); return; }
+    const items = getSelectedItems();
+    const mainCount = items.filter(it => it.dish_type === 'main').length;
+    const sideCount = items.filter(it => it.dish_type === 'side').length;
+    if (mainCount < 1) { showToast('請至少選擇 1 個主食類菜式', 'warning'); return; }
+    if (sideCount < 1) { showToast('請至少選擇 1 個飲品/湯品類菜式', 'warning'); return; }
 
     const formData = new FormData();
     formData.append('name', name);
     formData.append('price', price);
     formData.append('description', document.getElementById('comboDesc').value);
     formData.append('is_available', document.getElementById('comboAvailable').checked);
-    formData.append('dish_ids', JSON.stringify(dishIds.slice(0, 2)));
+    formData.append('items', JSON.stringify(items));
     const imgFile = document.getElementById('comboImage').files[0];
     if (imgFile) formData.append('image', imgFile);
 

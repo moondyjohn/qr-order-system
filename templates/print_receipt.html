@@ -162,6 +162,14 @@
             <span class="item-detail">{{ item.quantity }} × {{ "%.2f"|format(item.unit_price) }}</span>
             <span class="item-subtotal">{{ "%.2f"|format(item.unit_price * item.quantity) }}</span>
         </div>
+        {% if item.combo_selections %}
+        <div style="font-size:12px;color:#555;padding-left:12px;text-align:left;margin-bottom:2px;">
+            {% set selections = item.combo_selections|from_json %}
+            {% for sel in selections %}
+            <div>- {{ sel.dish_name }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% endfor %}
 
         <hr class="separator">

@@ -29,6 +29,12 @@ os.makedirs(app.config['QR_FOLDER'], exist_ok=True)
 init_db(app)
 
 
+@app.template_filter('from_json')
+def from_json_filter(value):
+    import json
+    return json.loads(value) if value else []
+
+
 def generate_qr_code(table_number, base_url=None):
     """生成檯號二維碼，返回 base64 圖片數據"""
     if base_url is None:
@@ -88,7 +94,9 @@ def get_table_orders(table_number):
         items = [{
             'dish_name': i.dish_name,
             'quantity': i.quantity,
-            'unit_price': i.unit_price
+            'unit_price': i.unit_price,
+            'combo_id': i.combo_id,
+            'combo_selections': i.combo_selections
         } for i in o.items]
         result.append({
             'id': o.id,
@@ -124,6 +132,11 @@ def submit_order(table_number):
             combo = Combo.query.get(item['combo_id'])
             if not combo or not combo.is_available:
                 return jsonify({'error': f'套餐「{combo.name if combo else "未知"}」已下架'}), 400
+
+            selections = item.get('selections', [])
+            import json
+            combo_selections_json = json.dumps(selections, ensure_ascii=False)
+
             total += combo.price * qty
             order_item = OrderItem(
                 order_id=order.id,
@@ -131,7 +144,8 @@ def submit_order(table_number):
                 combo_id=combo.id,
                 dish_name=combo.name,
                 quantity=qty,
-                unit_price=combo.price
+                unit_price=combo.price,
+                combo_selections=combo_selections_json
             )
             db.session.add(order_item)
         else:
@@ -445,7 +459,7 @@ def get_combos():
     combos = Combo.query.order_by(Combo.id.desc()).all()
     result = []
     for c in combos:
-        dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name} for ci in c.items]
+        dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name, 'dish_type': ci.dish_type} for ci in c.items]
         result.append({
             'id': c.id,
             'name': c.name,
@@ -462,7 +476,7 @@ def get_combos():
 @admin_required
 def get_combo(combo_id):
     c = Combo.query.get_or_404(combo_id)
-    dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name} for ci in c.items]
+    dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name, 'dish_type': ci.dish_type} for ci in c.items]
     return jsonify({
         'id': c.id,
         'name': c.name,
@@ -507,16 +521,19 @@ def add_combo():
     db.session.flush()
 
     # 處理關聯菜式
-    dish_ids = data.get('dish_ids')
-    if dish_ids:
-        if isinstance(dish_ids, str):
-            import json
-            dish_ids = json.loads(dish_ids)
-        if isinstance(dish_ids, list) and len(dish_ids) >= 2:
-            for did in dish_ids[:2]:
-                dish = Dish.query.get(int(did))
-                if dish:
-                    db.session.add(ComboItem(combo_id=combo.id, dish_id=dish.id))
+    items_json = data.get('items')
+    if items_json:
+        import json
+        if isinstance(items_json, str):
+            items_json = json.loads(items_json)
+        for it in items_json:
+            dish = Dish.query.get(int(it.get('dish_id')))
+            if dish:
+                db.session.add(ComboItem(
+                    combo_id=combo.id,
+                    dish_id=dish.id,
+                    dish_type=it.get('dish_type', 'main')
+                ))
 
     db.session.commit()
     return jsonify({'success': True, 'combo_id': combo.id})
@@ -553,18 +570,21 @@ def update_combo(combo_id):
             combo.image_path = f'/static/uploads/{filename}'
 
     # 處理關聯菜式
-    dish_ids = data.get('dish_ids')
-    if dish_ids is not None:
-        if isinstance(dish_ids, str):
-            import json
-            dish_ids = json.loads(dish_ids)
+    items_json = data.get('items')
+    if items_json is not None:
+        import json
+        if isinstance(items_json, str):
+            items_json = json.loads(items_json)
         # 清除舊關聯
         ComboItem.query.filter_by(combo_id=combo.id).delete()
-        if isinstance(dish_ids, list) and len(dish_ids) >= 2:
-            for did in dish_ids[:2]:
-                dish = Dish.query.get(int(did))
-                if dish:
-                    db.session.add(ComboItem(combo_id=combo.id, dish_id=dish.id))
+        for it in items_json:
+            dish = Dish.query.get(int(it.get('dish_id')))
+            if dish:
+                db.session.add(ComboItem(
+                    combo_id=combo.id,
+                    dish_id=dish.id,
+                    dish_type=it.get('dish_type', 'main')
+                ))
 
     db.session.commit()
     return jsonify({'success': True})
@@ -901,7 +921,9 @@ def print_order(order_id):
     items = [{
         'dish_name': i.dish_name,
         'quantity': i.quantity,
-        'unit_price': i.unit_price
+        'unit_price': i.unit_price,
+        'combo_id': i.combo_id,
+        'combo_selections': i.combo_selections
     } for i in order.items]
     order_time = order.created_at.strftime('%Y-%m-%d %H:%M:%S')
     return render_template('print_receipt.html',

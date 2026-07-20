@@ -59,6 +59,7 @@ class ComboItem(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     combo_id = db.Column(db.Integer, db.ForeignKey('combos.id'), nullable=False)
     dish_id = db.Column(db.Integer, db.ForeignKey('dishes.id'), nullable=False)
+    dish_type = db.Column(db.String(20), default='main')  # 'main'=主食类, 'side'=饮品类/汤品类
     dish = db.relationship('Dish')
 
 
@@ -85,6 +86,7 @@ class OrderItem(db.Model):
     dish_name = db.Column(db.String(100))
     quantity = db.Column(db.Integer, nullable=False, default=1)
     unit_price = db.Column(db.Float, nullable=False, default=0)
+    combo_selections = db.Column(db.Text, default='')  # JSON: 套餐内选中的菜品列表
 
     dish = db.relationship('Dish', backref='order_items')
 
