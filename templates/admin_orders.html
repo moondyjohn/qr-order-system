@@ -12,8 +12,8 @@
                 <option value="completed">已完成</option>
                 <option value="cancelled">已取消</option>
             </select>
-            <button class="btn btn-sm" id="autoPrintBtn" onclick="toggleAutoPrint()" style="white-space:nowrap;">
-                🔔 自動出票：關
+            <button class="btn btn-sm btn-success" id="autoPrintBtn" onclick="toggleAutoPrint()" style="white-space:nowrap;">
+                🔔 自動出票：開
             </button>
         </div>
     </div>
@@ -147,8 +147,11 @@ function updateStatus(orderId, status) {
 
 loadOrders();
 
+// 自動刷新訂單列表（每2秒）
+setInterval(loadOrders, 2000);
+
 // ===== 自動出票（綁定管理電腦）=====
-let autoPrintEnabled = false;
+let autoPrintEnabled = true;
 let seenOrderIds = new Set();
 let autoPrintTimer = null;
 
@@ -209,5 +212,8 @@ printOrder = function(orderId) {
 };
 
 initSeenOrders();
+
+// 預設開啟自動出票
+autoPrintTimer = setInterval(pollNewOrders, 3000);
 </script>
 {% endblock %}
