@@ -13,32 +13,32 @@
 
         body {
             background: #f0f0f0;
-            font-family: 'Courier New', 'SimSun', 'Microsoft YaHei', monospace;
+            font-family: Arial, 'Microsoft YaHei', 'SimHei', sans-serif;
             display: flex;
             justify-content: center;
             padding: 20px;
         }
 
         .receipt {
-            width: 90mm;
+            width: 95mm;
             background: #fff;
-            padding: 6mm 4mm 5mm;
-            font-size: 16px;
-            line-height: 1.5;
+            padding: 5mm 3mm 4mm;
+            font-size: 15px;
+            line-height: 1.4;
             color: #000;
             text-align: center;
         }
 
         .receipt .store-name {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: bold;
-            letter-spacing: 4px;
-            margin-bottom: 6px;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
         }
 
         .receipt .info-row {
-            font-size: 15px;
-            margin-bottom: 3px;
+            font-size: 14px;
+            margin-bottom: 2px;
             text-align: center;
         }
 
@@ -61,33 +61,36 @@
             justify-content: space-between;
             align-items: baseline;
             text-align: left;
-            padding: 3px 0;
+            padding: 2px 0;
             font-size: 15px;
         }
 
         .receipt .item-name {
-            flex: 1;
+            flex: 1 1 auto;
             text-align: left;
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
             font-weight: bold;
+            min-width: 0;
         }
 
         .receipt .item-detail {
             white-space: nowrap;
-            margin-left: 6px;
-            color: #333;
+            margin-left: 8px;
+            color: #000;
             font-size: 14px;
+            flex-shrink: 0;
         }
 
         .receipt .item-subtotal {
             white-space: nowrap;
-            margin-left: 6px;
+            margin-left: 8px;
             text-align: right;
-            min-width: 60px;
+            min-width: 70px;
             font-weight: bold;
             font-size: 15px;
+            flex-shrink: 0;
         }
 
         .receipt .total-row {
@@ -95,26 +98,27 @@
             justify-content: space-between;
             font-size: 18px;
             font-weight: bold;
-            padding: 4px 0;
+            padding: 3px 0;
             margin-top: 2px;
         }
 
         .receipt .total-amount {
-            font-size: 26px;
+            font-size: 24px;
             letter-spacing: 1px;
+            flex-shrink: 0;
         }
 
         .receipt .footer-text {
-            margin-top: 8px;
+            margin-top: 6px;
             font-size: 16px;
             font-weight: bold;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
         }
 
         .receipt .footer-sub {
             font-size: 12px;
             color: #444;
-            margin-top: 4px;
+            margin-top: 3px;
         }
 
         /* 打印控制 */
@@ -123,17 +127,17 @@
                 background: #fff;
                 padding: 0;
                 margin: 0;
-                width: 90mm;
+                width: 95mm;
             }
 
             .receipt {
                 box-shadow: none;
-                padding: 4mm 3mm 3mm;
-                width: 90mm;
+                padding: 3mm 2mm 2mm;
+                width: 95mm;
             }
 
             @page {
-                size: 90mm auto;
+                size: 95mm auto;
                 margin: 0;
             }
         }
