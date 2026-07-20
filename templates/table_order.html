@@ -190,6 +190,7 @@ body { padding-bottom: 90px; }
             {% for cat in categories.keys() %}
             <a href="#cat-{{ cat.id }}" data-cat="{{ cat.id }}">{{ cat.name }}</a>
             {% endfor %}
+            <a href="#cat-combo" data-cat="combo">套餐</a>
         </div>
 
         <div style="padding: 12px 0;">
@@ -226,6 +227,36 @@ body { padding-bottom: 90px; }
                 暫無菜式，請聯繫商家添加
             </div>
             {% endfor %}
+            {% if combos %}
+            <div class="dish-section" id="cat-combo">
+                <div class="dish-section-title">套餐</div>
+                <div class="dish-grid">
+                    {% for combo in combos %}
+                    <div class="dish-card" data-combo-id="{{ combo.id }}" data-category="combo">
+                        {% if combo.image_path %}
+                        <img src="{{ combo.image_path }}" alt="{{ combo.name }}" class="dish-img">
+                        {% else %}
+                        <div class="dish-img" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:linear-gradient(135deg,#FAF5F0,#F0E8DE);">🎁</div>
+                        {% endif %}
+                        <div class="dish-info">
+                            <div class="dish-name">{{ combo.name }}</div>
+                            <div class="dish-desc" style="font-size:11px;color:var(--text-light);">
+                                包含：{% for ci in combo.items %}{{ ci.dish.name }}{% if not loop.last %}、{% endif %}{% endfor %}
+                            </div>
+                            <div class="dish-bottom">
+                                <div class="dish-price">{{ "%.2f"|format(combo.price) }}</div>
+                                <div class="quantity-ctrl">
+                                    <button onclick="changeComboQty({{ combo.id }}, -1)">−</button>
+                                    <span class="qty-num" id="qty-combo-{{ combo.id }}">0</span>
+                                    <button onclick="changeComboQty({{ combo.id }}, 1)">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -356,7 +387,7 @@ document.querySelectorAll('#categoryNav a').forEach(a => {
 });
 
 function changeQty(dishId, delta) {
-    if (!cart[dishId]) cart[dishId] = { name: '', price: 0, qty: 0 };
+    if (!cart[dishId]) cart[dishId] = { name: '', price: 0, qty: 0, isCombo: false };
     const card = document.querySelector(`[data-dish-id="${dishId}"]`);
     const name = card.querySelector('.dish-name').textContent;
     const price = parseFloat(card.querySelector('.dish-price').textContent);
@@ -365,6 +396,20 @@ function changeQty(dishId, delta) {
     cart[dishId].qty = Math.max(0, cart[dishId].qty + delta);
     if (cart[dishId].qty === 0) delete cart[dishId];
     document.getElementById(`qty-${dishId}`).textContent = cart[dishId] ? cart[dishId].qty : 0;
+    updateCart();
+}
+
+function changeComboQty(comboId, delta) {
+    const key = 'combo_' + comboId;
+    if (!cart[key]) cart[key] = { name: '', price: 0, qty: 0, isCombo: true, comboId: comboId };
+    const card = document.querySelector(`[data-combo-id="${comboId}"]`);
+    const name = card.querySelector('.dish-name').textContent;
+    const price = parseFloat(card.querySelector('.dish-price').textContent);
+    cart[key].name = name;
+    cart[key].price = price;
+    cart[key].qty = Math.max(0, cart[key].qty + delta);
+    if (cart[key].qty === 0) delete cart[key];
+    document.getElementById(`qty-combo-${comboId}`).textContent = cart[key] ? cart[key].qty : 0;
     updateCart();
 }
 
@@ -390,9 +435,14 @@ function submitOrder() {
 function closeRemark() { document.getElementById('remarkModal').classList.remove('active'); }
 
 function confirmOrder() {
-    const items = Object.keys(cart).map(id => ({
-        dish_id: parseInt(id), quantity: cart[id].qty
-    }));
+    const items = Object.keys(cart).map(key => {
+        const c = cart[key];
+        if (c.isCombo) {
+            return { combo_id: c.comboId, quantity: c.qty };
+        } else {
+            return { dish_id: parseInt(key), quantity: c.qty };
+        }
+    });
     const cartSnapshot = {};
     Object.keys(cart).forEach(id => { cartSnapshot[id] = {...cart[id]}; });
 
@@ -421,9 +471,14 @@ function confirmOrder() {
                     newItems.push(...data.order.items);
                 } else {
                     items.forEach(it => {
-                        const snap = cartSnapshot[it.dish_id];
+                        let snap;
+                        if (it.combo_id) {
+                            snap = cartSnapshot['combo_' + it.combo_id];
+                        } else {
+                            snap = cartSnapshot[it.dish_id];
+                        }
                         newItems.push({
-                            dish_name: snap ? snap.name : ('菜式#' + it.dish_id),
+                            dish_name: snap ? snap.name : (it.combo_id ? ('套餐#' + it.combo_id) : ('菜式#' + it.dish_id)),
                             quantity: it.quantity,
                             price: snap ? snap.price : 0
                         });

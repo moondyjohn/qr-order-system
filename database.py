@@ -42,6 +42,26 @@ class Dish(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 
+class Combo(db.Model):
+    __tablename__ = 'combos'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    price = db.Column(db.Float, nullable=False, default=0)
+    description = db.Column(db.Text, default='')
+    image_path = db.Column(db.String(500), default='')
+    is_available = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    items = db.relationship('ComboItem', backref='combo', lazy=True, cascade='all, delete-orphan')
+
+
+class ComboItem(db.Model):
+    __tablename__ = 'combo_items'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    combo_id = db.Column(db.Integer, db.ForeignKey('combos.id'), nullable=False)
+    dish_id = db.Column(db.Integer, db.ForeignKey('dishes.id'), nullable=False)
+    dish = db.relationship('Dish')
+
+
 class Order(db.Model):
     __tablename__ = 'orders'
 
@@ -60,7 +80,8 @@ class OrderItem(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    dish_id = db.Column(db.Integer, db.ForeignKey('dishes.id'), nullable=False)
+    dish_id = db.Column(db.Integer, db.ForeignKey('dishes.id'), nullable=True)
+    combo_id = db.Column(db.Integer, db.ForeignKey('combos.id'), nullable=True)
     dish_name = db.Column(db.String(100))
     quantity = db.Column(db.Integer, nullable=False, default=1)
     unit_price = db.Column(db.Float, nullable=False, default=0)

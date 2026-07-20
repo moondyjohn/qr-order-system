@@ -1,0 +1,250 @@
+{% extends "admin.html" %}
+{% block title %}套餐管理 - 管理後台{% endblock %}
+{% block admin_content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">🎁 套餐管理</div>
+        <button class="btn btn-primary" onclick="openComboModal()">+ 添加套餐</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>圖片</th>
+                    <th>套餐名</th>
+                    <th>包含菜式</th>
+                    <th>價格</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="comboTableBody">
+                <tr><td colspan="7" style="text-align:center;color:var(--text-light);">載入中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 添加/編輯套餐彈窗 -->
+<div class="modal-overlay" id="comboModal">
+    <div class="modal" style="max-width: 640px;">
+        <div class="modal-title" id="comboModalTitle">添加套餐</div>
+        <form id="comboForm" enctype="multipart/form-data">
+            <input type="hidden" id="comboId" value="">
+            <div class="form-group">
+                <label>套餐名稱 *</label>
+                <input type="text" class="form-control" id="comboName" required placeholder="如：超值雙人餐">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>套餐價格 (元) *</label>
+                    <input type="number" class="form-control" id="comboPrice" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>套餐描述</label>
+                <textarea class="form-control" id="comboDesc" placeholder="簡要描述套餐..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>選擇菜式（至少選 2 個）</label>
+                <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-light);border-radius:var(--radius);padding:12px;" id="dishCheckboxList">
+                    <span style="color:var(--text-light);">載入菜式列表...</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>套餐圖片</label>
+                <div class="image-upload-area" id="imageUploadArea">
+                    <input type="file" id="comboImage" accept="image/*">
+                    <div id="imagePreview">
+                        <span style="font-size:32px;">📷</span>
+                        <p style="color:var(--text-light);font-size:13px;">點擊上傳套餐圖片</p>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="comboAvailable" checked>
+                    上架售賣
+                </label>
+            </div>
+        </form>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeComboModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveCombo()">保存</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+let allDishes = [];
+
+function loadDishList() {
+    fetch('/api/admin/dishes')
+        .then(r => r.json())
+        .then(data => {
+            allDishes = data;
+            renderDishCheckboxes([]);
+        });
+}
+
+function renderDishCheckboxes(selectedIds) {
+    const container = document.getElementById('dishCheckboxList');
+    if (allDishes.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-light);">暫無菜式，請先添加菜式</span>';
+        return;
+    }
+    container.innerHTML = allDishes.map(d => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--border-light);">
+            <input type="checkbox" class="dish-check" value="${d.id}" ${selectedIds.includes(d.id) ? 'checked' : ''}>
+            <span><strong>${d.name}</strong> <span style="color:var(--text-light);font-size:12px;">(${d.category_name})</span></span>
+            <span style="margin-left:auto;color:var(--danger);font-weight:600;">$${d.price.toFixed(2)}</span>
+        </label>
+    `).join('');
+}
+
+function getSelectedDishIds() {
+    const checks = document.querySelectorAll('.dish-check:checked');
+    return Array.from(checks).map(c => parseInt(c.value));
+}
+
+function loadCombos() {
+    fetch('/api/admin/combos')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('comboTableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-light);">暫無套餐，點擊右上角添加</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(c => {
+                const dishNames = c.dishes.map(d => d.dish_name).join('、') || '—';
+                return `
+                <tr>
+                    <td>${c.id}</td>
+                    <td>
+                        ${c.image_path
+                            ? `<img src="${c.image_path}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;">`
+                            : '<span style="color:var(--text-light);">無圖</span>'}
+                    </td>
+                    <td><strong>${c.name}</strong></td>
+                    <td style="font-size:13px;">${dishNames}</td>
+                    <td style="color:var(--danger);font-weight:600;">$${c.price.toFixed(2)}</td>
+                    <td>
+                        <span class="badge ${c.is_available ? 'badge-completed' : 'badge-cancelled'}">
+                            ${c.is_available ? '上架' : '下架'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="editCombo(${c.id})">編輯</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteCombo(${c.id})" style="margin-left:4px;">刪除</button>
+                    </td>
+                </tr>
+            `}).join('');
+        });
+}
+
+function openComboModal() {
+    document.getElementById('comboModalTitle').textContent = '添加套餐';
+    document.getElementById('comboId').value = '';
+    document.getElementById('comboForm').reset();
+    document.getElementById('comboAvailable').checked = true;
+    document.getElementById('imagePreview').innerHTML = '<span style="font-size:32px;">📷</span><p style="color:var(--text-light);font-size:13px;">點擊上傳套餐圖片</p>';
+    loadDishList();
+    document.getElementById('comboModal').classList.add('active');
+}
+
+function closeComboModal() {
+    document.getElementById('comboModal').classList.remove('active');
+}
+
+function editCombo(id) {
+    fetch('/api/admin/combos/' + id)
+        .then(r => r.json())
+        .then(c => {
+            document.getElementById('comboModalTitle').textContent = '編輯套餐';
+            document.getElementById('comboId').value = c.id;
+            document.getElementById('comboName').value = c.name;
+            document.getElementById('comboPrice').value = c.price;
+            document.getElementById('comboDesc').value = c.description || '';
+            document.getElementById('comboAvailable').checked = c.is_available;
+            if (c.image_path) {
+                document.getElementById('imagePreview').innerHTML = `<img src="${c.image_path}" class="preview-img">`;
+            } else {
+                document.getElementById('imagePreview').innerHTML = '<span style="font-size:32px;">📷</span><p style="color:var(--text-light);font-size:13px;">點擊上傳套餐圖片</p>';
+            }
+            // 載入菜式列表並勾選已選擇的
+            fetch('/api/admin/dishes').then(r => r.json()).then(dishes => {
+                allDishes = dishes;
+                const selectedIds = c.dishes.map(d => d.dish_id);
+                renderDishCheckboxes(selectedIds);
+            });
+            document.getElementById('comboModal').classList.add('active');
+        });
+}
+
+function saveCombo() {
+    const id = document.getElementById('comboId').value;
+    const name = document.getElementById('comboName').value.trim();
+    if (!name) { showToast('請輸入套餐名稱', 'warning'); return; }
+    const price = parseFloat(document.getElementById('comboPrice').value);
+    if (isNaN(price) || price < 0) { showToast('請輸入有效價格', 'warning'); return; }
+
+    const dishIds = getSelectedDishIds();
+    if (dishIds.length < 2) { showToast('請至少選擇 2 個菜式', 'warning'); return; }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('price', price);
+    formData.append('description', document.getElementById('comboDesc').value);
+    formData.append('is_available', document.getElementById('comboAvailable').checked);
+    formData.append('dish_ids', JSON.stringify(dishIds.slice(0, 2)));
+    const imgFile = document.getElementById('comboImage').files[0];
+    if (imgFile) formData.append('image', imgFile);
+
+    const url = id ? `/api/admin/combos/${id}` : '/api/admin/combos';
+    const method = id ? 'PUT' : 'POST';
+
+    fetch(url, { method, body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { showToast(id ? '修改成功' : '添加成功'); closeComboModal(); loadCombos(); }
+            else showToast(data.error || '操作失敗', 'error');
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+function deleteCombo(id) {
+    if (!confirm('確定刪除該套餐嗎？')) return;
+    fetch(`/api/admin/combos/${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || '刪除成功');
+                loadCombos();
+            } else {
+                showToast(data.error || '刪除失敗', 'error');
+            }
+        })
+        .catch(() => showToast('網絡錯誤', 'error'));
+}
+
+// 圖片預覽
+document.getElementById('comboImage').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            document.getElementById('imagePreview').innerHTML = `<img src="${ev.target.result}" class="preview-img">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+loadCombos();
+</script>
+{% endblock %}

@@ -12,7 +12,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from functools import wraps
 from PIL import Image
 
-from database import db, init_db, Table, Category, Dish, Order, OrderItem
+from database import db, init_db, Table, Category, Dish, Order, OrderItem, Combo, ComboItem
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///qr_order.db'
@@ -69,9 +69,10 @@ def order_page(table_number):
         dishes = Dish.query.filter_by(category_id=cat.id, is_available=True).all()
         if dishes:
             dishes_by_category[cat] = dishes
+    combos = Combo.query.filter_by(is_available=True).all()
     from_home = request.args.get('ref') == 'home'
     return render_template('table_order.html', table=table,
-                          categories=dishes_by_category, from_home=from_home)
+                          categories=dishes_by_category, combos=combos, from_home=from_home)
 
 
 @app.route('/api/order/<table_number>/orders', methods=['GET'])
@@ -116,24 +117,42 @@ def submit_order(table_number):
 
     total = 0
     for item in items:
-        dish = Dish.query.get(item['dish_id'])
-        if not dish or not dish.is_available:
-            return jsonify({'error': f'菜式「{dish.name if dish else "未知"}」已下架'}), 400
         qty = int(item.get('quantity', 1))
-        if dish.stock > 0 and dish.stock < qty:
-            return jsonify({'error': f'「{dish.name}」庫存不足，剩餘 {dish.stock}'}), 400
-        subtotal = dish.price * qty
-        total += subtotal
-        order_item = OrderItem(
-            order_id=order.id,
-            dish_id=dish.id,
-            dish_name=dish.name,
-            quantity=qty,
-            unit_price=dish.price
-        )
-        db.session.add(order_item)
-        if dish.stock > 0:
-            dish.stock -= qty
+
+        # 套餐下單
+        if item.get('combo_id'):
+            combo = Combo.query.get(item['combo_id'])
+            if not combo or not combo.is_available:
+                return jsonify({'error': f'套餐「{combo.name if combo else "未知"}」已下架'}), 400
+            total += combo.price * qty
+            order_item = OrderItem(
+                order_id=order.id,
+                dish_id=None,
+                combo_id=combo.id,
+                dish_name=combo.name,
+                quantity=qty,
+                unit_price=combo.price
+            )
+            db.session.add(order_item)
+        else:
+            dish = Dish.query.get(item['dish_id'])
+            if not dish or not dish.is_available:
+                return jsonify({'error': f'菜式「{dish.name if dish else "未知"}」已下架'}), 400
+            if dish.stock > 0 and dish.stock < qty:
+                return jsonify({'error': f'「{dish.name}」庫存不足，剩餘 {dish.stock}'}), 400
+            subtotal = dish.price * qty
+            total += subtotal
+            order_item = OrderItem(
+                order_id=order.id,
+                dish_id=dish.id,
+                combo_id=None,
+                dish_name=dish.name,
+                quantity=qty,
+                unit_price=dish.price
+            )
+            db.session.add(order_item)
+            if dish.stock > 0:
+                dish.stock -= qty
 
     order.total_price = total
     db.session.commit()
@@ -204,6 +223,13 @@ def admin_orders():
 @admin_required
 def admin_categories():
     return render_template('admin_categories.html')
+
+
+@app.route('/admin/combos')
+@admin_required
+def admin_combos():
+    categories = Category.query.order_by(Category.sort_order).all()
+    return render_template('admin_combos.html', categories=categories)
 
 
 @app.route('/admin/reports')
@@ -409,6 +435,155 @@ def delete_dish(dish_id):
             'action': 'hard_delete',
             'message': f'「{dish.name}」已永久刪除'
         })
+
+
+# ======================== 套餐管理 API ========================
+
+@app.route('/api/admin/combos', methods=['GET'])
+@admin_required
+def get_combos():
+    combos = Combo.query.order_by(Combo.id.desc()).all()
+    result = []
+    for c in combos:
+        dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name} for ci in c.items]
+        result.append({
+            'id': c.id,
+            'name': c.name,
+            'price': c.price,
+            'description': c.description,
+            'image_path': c.image_path,
+            'is_available': c.is_available,
+            'dishes': dishes
+        })
+    return jsonify(result)
+
+
+@app.route('/api/admin/combos/<int:combo_id>', methods=['GET'])
+@admin_required
+def get_combo(combo_id):
+    c = Combo.query.get_or_404(combo_id)
+    dishes = [{'dish_id': ci.dish_id, 'dish_name': ci.dish.name} for ci in c.items]
+    return jsonify({
+        'id': c.id,
+        'name': c.name,
+        'price': c.price,
+        'description': c.description,
+        'image_path': c.image_path,
+        'is_available': c.is_available,
+        'dishes': dishes
+    })
+
+
+@app.route('/api/admin/combos', methods=['POST'])
+@admin_required
+def add_combo():
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': '套餐名稱不能為空'}), 400
+
+    combo = Combo(
+        name=name,
+        price=float(data.get('price', 0)),
+        description=data.get('description', ''),
+        is_available=str(data.get('is_available', 'true')).lower() in ('true', '1', 'on')
+    )
+
+    # 處理圖片上傳
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename:
+            ext = os.path.splitext(file.filename)[1].lower()
+            filename = f"combo_{uuid.uuid4().hex}{ext}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            combo.image_path = f"/static/uploads/{filename}"
+
+    db.session.add(combo)
+    db.session.flush()
+
+    # 處理關聯菜式
+    dish_ids = data.get('dish_ids')
+    if dish_ids:
+        if isinstance(dish_ids, str):
+            import json
+            dish_ids = json.loads(dish_ids)
+        if isinstance(dish_ids, list) and len(dish_ids) >= 2:
+            for did in dish_ids[:2]:
+                dish = Dish.query.get(int(did))
+                if dish:
+                    db.session.add(ComboItem(combo_id=combo.id, dish_id=dish.id))
+
+    db.session.commit()
+    return jsonify({'success': True, 'combo_id': combo.id})
+
+
+@app.route('/api/admin/combos/<int:combo_id>', methods=['PUT'])
+@admin_required
+def update_combo(combo_id):
+    combo = Combo.query.get_or_404(combo_id)
+
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+
+    combo.name = data.get('name', combo.name)
+    combo.price = float(data.get('price', combo.price))
+    combo.description = data.get('description', combo.description)
+    combo.is_available = str(data.get('is_available', '')).lower() in ('true', '1', 'on')
+
+    # 處理圖片上傳
+    if 'image' in request.files:
+        img = request.files['image']
+        if img and img.filename:
+            filename = f"combo_{combo_id}_{int(time.time())}{os.path.splitext(img.filename)[1]}"
+            img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+            os.makedirs(img_dir, exist_ok=True)
+            img_path = os.path.join(img_dir, filename)
+            img.save(img_path)
+            if combo.image_path:
+                old_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), combo.image_path.lstrip('/'))
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            combo.image_path = f'/static/uploads/{filename}'
+
+    # 處理關聯菜式
+    dish_ids = data.get('dish_ids')
+    if dish_ids is not None:
+        if isinstance(dish_ids, str):
+            import json
+            dish_ids = json.loads(dish_ids)
+        # 清除舊關聯
+        ComboItem.query.filter_by(combo_id=combo.id).delete()
+        if isinstance(dish_ids, list) and len(dish_ids) >= 2:
+            for did in dish_ids[:2]:
+                dish = Dish.query.get(int(did))
+                if dish:
+                    db.session.add(ComboItem(combo_id=combo.id, dish_id=dish.id))
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/admin/combos/<int:combo_id>', methods=['DELETE'])
+@admin_required
+def delete_combo(combo_id):
+    combo = Combo.query.get_or_404(combo_id)
+    # 刪除關聯
+    ComboItem.query.filter_by(combo_id=combo.id).delete()
+    # 刪除圖片
+    if combo.image_path:
+        img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), combo.image_path.lstrip('/'))
+        if os.path.exists(img_path):
+            os.remove(img_path)
+    db.session.delete(combo)
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'套餐「{combo.name}」已刪除'})
 
 
 @app.route('/api/admin/tables', methods=['GET'])
